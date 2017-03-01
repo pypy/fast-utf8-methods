@@ -10,28 +10,27 @@ void _print_mmx(const char * msg, __m128i chunk)
     // unpack the first 8 bytes, padding with zeros
     uint64_t a = _mm_extract_epi64(chunk, 0);
     uint64_t b = _mm_extract_epi64(chunk, 1);
-    printf("%x%x%x%x %x%x%x%x  %x%x%x%x %x%x%x%x",
-            (unsigned char)((a >> 56) & 0xff),
-            (unsigned char)((a >> 48) & 0xff),
-            (unsigned char)((a >> 40) & 0xff),
-            (unsigned char)((a >> 32) & 0xff),
-
-            (unsigned char)((a >> 24) & 0xff),
-            (unsigned char)((a >> 16) & 0xff),
-            (unsigned char)((a >> 8) & 0xff),
-            (unsigned char)((a >> 0) & 0xff),
-
-
-            (unsigned char)((b >> 56) & 0xff),
-            (unsigned char)((b >> 48) & 0xff),
-            (unsigned char)((b >> 40) & 0xff),
-            (unsigned char)((b >> 32) & 0xff),
-
-            (unsigned char)((b >> 24) & 0xff),
-            (unsigned char)((b >> 16) & 0xff),
+    printf("%.2x%.2x%.2x%.2x %.2x%.2x%.2x%.2x  %.2x%.2x%.2x%.2x %.2x%.2x%.2x%.2x",
+            (unsigned char)((b >> 0) & 0xff),
             (unsigned char)((b >> 8) & 0xff),
-            (unsigned char)((b >> 0) & 0xff)
-            );
+            (unsigned char)((b >> 16) & 0xff),
+            (unsigned char)((b >> 24) & 0xff),
+
+            (unsigned char)((b >> 32) & 0xff),
+            (unsigned char)((b >> 40) & 0xff),
+            (unsigned char)((b >> 48) & 0xff),
+            (unsigned char)((b >> 56) & 0xff),
+
+            (unsigned char)((a >> 0) & 0xff),
+            (unsigned char)((a >> 8) & 0xff),
+            (unsigned char)((a >> 16) & 0xff),
+            (unsigned char)((a >> 24) & 0xff),
+
+            (unsigned char)((a >> 32) & 0xff),
+            (unsigned char)((a >> 40) & 0xff),
+            (unsigned char)((a >> 48) & 0xff),
+            (unsigned char)((a >> 56) & 0xff)
+     );
 
     printf("\n");
 }
@@ -39,27 +38,66 @@ void _print_mmx(const char * msg, __m128i chunk)
 ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len, decoding_error_t * error)
 {
     size_t num_codepoints = 0;
-    __m128i chunk_signed;
+    __m128i chunk;
 
     if (len == 0) {
         return 0;
     }
+    __m128i zero = _mm_set1_epi8(0x00);
 
+    printf("%ld\n", len);
     while (len >= 16) {
-        chunk_signed = _mm_loadu_si128((__m128i*)encoded);
-        if (_mm_movemask_epi8(chunk_signed) == 0) {
+        chunk = _mm_loadu_si128((__m128i*)encoded);
+        if (_mm_movemask_epi8(chunk) == 0) {
             len -= 16;
             encoded += 16;
             num_codepoints += 16;
             continue;
         }
 
-        // state:          8080 8080  8080 8080
+        _print_mmx("chunk", chunk);
+        // fight agains the fact that there is no comparison on unsigned values
+        __m128i chunk_signed = _mm_add_epi8(chunk, _mm_set1_epi8(0x80));
+        _print_mmx("shunk", chunk_signed);
         __m128i state = _mm_set1_epi8(0x0 | 0x80);
-        // mask:           4141 4141  4141 4141
-        __m128i mask1 = _mm_set1_epi8(0xc2-1 -0x80);
-        __m128i cond2 = _mm_cmplt_epi8(mask1, chunk_signed);
+        __m128i cond2 = _mm_cmplt_epi8(_mm_set1_epi8(0xc2-1-0x80), chunk_signed);
         _print_mmx("cond2", cond2);
+
+        state = _mm_blendv_epi8(state, _mm_set1_epi8(0xc2),  cond2);
+        printf("blending\n");
+        _print_mmx("state", state);
+
+        __m128i only_2byte = _mm_cmplt_epi8( _mm_set1_epi8(0xe0-1 -0x80), chunk_signed);
+        _print_mmx("2byte", only_2byte);
+
+        //if (!_mm_movemask_epi8(only_2byte)) {
+        //    len -= 16;
+        //    encoded += 16;
+        //    num_codepoints += 8;
+        //    continue;
+        //}
+
+
+        // this is correct, compute the length
+        __m128i count = _mm_set1_epi8(0xc1)
+        count = _mm_blendv_epi8(count, zero,  cond2);
+        count =  _mm_and_si128(count, _mm_set1_epi8(0x7));
+        //#count = _mm_subs_epu8(count, _mm_set1_epi8(0x1));
+
+        _print_mmx("count", count);
+
+        // count the code points using 2x 32 bit hadd and one last 16 hadd
+        // the result will end up at the lowest position
+        count = _mm_hadd_epi32(count, count);
+        count = _mm_hadd_epi32(count, count);
+        _print_mmx("count", count);
+        count = _mm_hadd_epi16(count, count);
+        _print_mmx("count", count);
+        uint16_t c = _mm_extract_epi16(count, 0);
+
+        num_codepoints += (c & 0xff) + ((c >> 8) & 0xff);
+        len -= 16;
+        encoded += 16;
     }
 
     if (len == 0) {
@@ -86,10 +124,9 @@ int _check_continuation(const uint8_t ** encoded, const uint8_t * endptr, int co
     return 0;
 }
 
-ssize_t count_utf8_codepoints_slow(const uint8_t * encoded, size_t len, decoding_error_t * error)
-{
+ssize_t count_utf8_codepoints_slow(const uint8_t * encoded, size_t len, decoding_error_t * error) {
     size_t num_codepoints = 0;
-    uint8_t byte = 0, byte1, byte2, byte3;
+    uint8_t byte = 0;
     const uint8_t * endptr = encoded + len;
 
     while (encoded < endptr) {

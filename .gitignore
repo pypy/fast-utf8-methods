@@ -4,6 +4,8 @@
 *.o
 *.so
 _test*.c
+tests/*.c
+.hypothesis/
 __pycache__/
 *.pyc
 
