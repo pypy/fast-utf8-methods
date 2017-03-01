@@ -19,7 +19,7 @@ class AbstractUnicodeTestCase(object):
         else:
             define_allow_surrogates = "-DALLOW_SURROGATES=0"
         ffi.set_source(modulename, source,
-                include_dirs=['src'], extra_compile_args=['-g', define_allow_surrogates])
+                include_dirs=['src'], extra_compile_args=['-g', define_allow_surrogates, '-msse4.1'])
         ffi.compile(verbose=True)
         _test = importlib.import_module(modulename)
         clz.lib = _test.lib

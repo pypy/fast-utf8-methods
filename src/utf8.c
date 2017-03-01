@@ -1,18 +1,37 @@
 #include "utf8.h"
 
+#include <stdio.h>
 #include <xmmintrin.h>
+#include <smmintrin.h>
 
-void _print_mmx(const char * msg, __m128i i)
+void _print_mmx(const char * msg, __m128i chunk)
 {
     printf("%s:", msg);
     // unpack the first 8 bytes, padding with zeros
-    __m128i firstHalf = _mm_unpacklo_epi8(chunk, _mm_set1_epi8(0));
-    // and store to the destination
-    _mm_storeu_si128(reinterpret_cast<__m128i*>(dst), firstHalf); 
+    uint64_t a = _mm_extract_epi64(chunk, 0);
+    uint64_t b = _mm_extract_epi64(chunk, 1);
+    printf("%x%x%x%x %x%x%x%x  %x%x%x%x %x%x%x%x",
+            (unsigned char)((a >> 56) & 0xff),
+            (unsigned char)((a >> 48) & 0xff),
+            (unsigned char)((a >> 40) & 0xff),
+            (unsigned char)((a >> 32) & 0xff),
 
-    // do the same with the last 8 bytes
-    __m128i secondHalf = _mm_unpackhi_epi8 (chunk, _mm_set1_epi8(0));
-    _mm_storeu_si128(reinterpret_cast<__m128i*>(dst+8), secondHalf);
+            (unsigned char)((a >> 24) & 0xff),
+            (unsigned char)((a >> 16) & 0xff),
+            (unsigned char)((a >> 8) & 0xff),
+            (unsigned char)((a >> 0) & 0xff),
+
+
+            (unsigned char)((b >> 56) & 0xff),
+            (unsigned char)((b >> 48) & 0xff),
+            (unsigned char)((b >> 40) & 0xff),
+            (unsigned char)((b >> 32) & 0xff),
+
+            (unsigned char)((b >> 24) & 0xff),
+            (unsigned char)((b >> 16) & 0xff),
+            (unsigned char)((b >> 8) & 0xff),
+            (unsigned char)((b >> 0) & 0xff)
+            );
 
     printf("\n");
 }
