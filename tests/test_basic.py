@@ -53,15 +53,23 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
         error = self.ffi.new("decoding_error_t[1]")
         assert self.lib.count_utf8_codepoints_slow(b"\xe1\x80\x80", 3, error) == 1
 
-    def test_check_utf8_fast_single(self):
-        #@given(bytestring=st.binary())
-        #@example(bytestring="aaaabbbbccccdddd")
-        #@example(bytestring="\xc2\x80"*8)
+    @given(string=st.text(min_length=16, max_length=16))
+    def test_check_correct_utf8_fast(self, string):
+        error = self.ffi.new("decoding_error_t[1]")
+        check = lambda b: self.lib.count_utf8_codepoints(b, len(b), error)
+        try:
+            bytestring = string.encode('utf-8')
+        except UnicodeEncodeError:
+            return # skip
+        result, bytestring = _utf8_check(string)
+        assert check(bytestring) == result
+
+    def test_test(self):
         error = self.ffi.new("decoding_error_t[1]")
 
         check = lambda b: self.lib.count_utf8_codepoints(b, len(b), error)
 
-        ss = ('\x00' * 14)+'\xc2\x80'
+        ss = '\xe6\x88\x91''\x00\x00\x00''\xf0\xa2\xad\x83''\x00\x00\x00\x00''\xc2\x80'
         result, bytestring = _utf8_check(ss)
         assert check(bytestring) == result
 

@@ -11,16 +11,6 @@ void _print_mmx(const char * msg, __m128i chunk)
     uint64_t a = _mm_extract_epi64(chunk, 0);
     uint64_t b = _mm_extract_epi64(chunk, 1);
     printf("%.2x%.2x%.2x%.2x %.2x%.2x%.2x%.2x  %.2x%.2x%.2x%.2x %.2x%.2x%.2x%.2x",
-            (unsigned char)((b >> 0) & 0xff),
-            (unsigned char)((b >> 8) & 0xff),
-            (unsigned char)((b >> 16) & 0xff),
-            (unsigned char)((b >> 24) & 0xff),
-
-            (unsigned char)((b >> 32) & 0xff),
-            (unsigned char)((b >> 40) & 0xff),
-            (unsigned char)((b >> 48) & 0xff),
-            (unsigned char)((b >> 56) & 0xff),
-
             (unsigned char)((a >> 0) & 0xff),
             (unsigned char)((a >> 8) & 0xff),
             (unsigned char)((a >> 16) & 0xff),
@@ -29,7 +19,17 @@ void _print_mmx(const char * msg, __m128i chunk)
             (unsigned char)((a >> 32) & 0xff),
             (unsigned char)((a >> 40) & 0xff),
             (unsigned char)((a >> 48) & 0xff),
-            (unsigned char)((a >> 56) & 0xff)
+            (unsigned char)((a >> 56) & 0xff),
+
+            (unsigned char)((b >> 0) & 0xff),
+            (unsigned char)((b >> 8) & 0xff),
+            (unsigned char)((b >> 16) & 0xff),
+            (unsigned char)((b >> 24) & 0xff),
+
+            (unsigned char)((b >> 32) & 0xff),
+            (unsigned char)((b >> 40) & 0xff),
+            (unsigned char)((b >> 48) & 0xff),
+            (unsigned char)((b >> 56) & 0xff)
      );
 
     printf("\n");
@@ -63,12 +63,12 @@ ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len, decoding_erro
         __m128i cond2 = _mm_cmplt_epi8(_mm_set1_epi8(0xc2-1-0x80), chunk_signed);
         _print_mmx("cond2", cond2);
 
-        state = _mm_blendv_epi8(state, _mm_set1_epi8(0xc2),  cond2);
         printf("blending\n");
+        state = _mm_blendv_epi8(state, _mm_set1_epi8(0xc2),  cond2);
         _print_mmx("state", state);
 
-        __m128i only_2byte = _mm_cmplt_epi8( _mm_set1_epi8(0xe0-1 -0x80), chunk_signed);
-        _print_mmx("2byte", only_2byte);
+        //__m128i only_2byte = _mm_cmplt_epi8( _mm_set1_epi8(0xe0-1 -0x80), chunk_signed);
+        //_print_mmx("2byte", only_2byte);
 
         //if (!_mm_movemask_epi8(only_2byte)) {
         //    len -= 16;
@@ -79,9 +79,17 @@ ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len, decoding_erro
 
 
         // this is correct, compute the length
-        __m128i count = _mm_set1_epi8(0xc1)
-        count = _mm_blendv_epi8(count, zero,  cond2);
+        __m128i count = _mm_set1_epi8(0xc1);
+        __m128i is_continuation = _mm_and_si128(_mm_set1_epi8(0xc0), chunk_signed);
+        _print_mmx("iscnt", is_continuation);
+        __m128i cont_spots = _mm_cmpeq_epi8(zero, is_continuation);
+        _print_mmx("aaabc", cont_spots);
         count =  _mm_and_si128(count, _mm_set1_epi8(0x7));
+
+        //__m128i cond2 = _mm_cmplt_epi8(_mm_set1_epi8(0xc2-1-0x80), chunk_signed);
+        // copy 0x00 over to each place which is a continuation byte
+        count = _mm_blendv_epi8(count, zero, cont_spots);
+        //count = _mm_blendv_epi8(count, zero,  cond2);
         //#count = _mm_subs_epu8(count, _mm_set1_epi8(0x1));
 
         _print_mmx("count", count);
