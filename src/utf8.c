@@ -35,6 +35,7 @@ void _print_mmx(const char * msg, __m128i chunk)
     printf("\n");
 }
 
+#define BIT(B,P) ((B >> (P-1)) & 0x1)
 ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len, decoding_error_t * error)
 {
     size_t num_codepoints = 0;
@@ -56,6 +57,7 @@ ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len, decoding_erro
             continue;
         }
 
+        __m128i count = _mm_set1_epi8(0x1);
         //_print_mmx("chunk", chunk);
         // fight against the fact that there is no comparison on unsigned values
         __m128i chunk_signed = _mm_add_epi8(chunk, _mm_set1_epi8(0x80));
@@ -163,14 +165,15 @@ ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len, decoding_erro
         }
 
         // CORRECT, calculate the length
-        __m128i count = _mm_set1_epi8(0xc1);
-        __m128i is_continuation = _mm_and_si128(_mm_set1_epi8(0xc0), chunk_signed);
-        __m128i cont_spots = _mm_cmpeq_epi8(zero, is_continuation);
-        count =  _mm_and_si128(count, _mm_set1_epi8(0x7));
+        _print_mmx("chunk", chunk);
+        __m128i mask = _mm_and_si128(_mm_set1_epi8(0xc0), chunk_signed);
+        __m128i is_continuation = _mm_cmpeq_epi8(_mm_set1_epi8(0xc0), chunk_signed);
+        _print_mmx("contin", is_continuation);
 
         //__m128i cond2 = _mm_cmplt_epi8(_mm_set1_epi8(0xc2-1-0x80), chunk_signed);
         // copy 0x00 over to each place which is a continuation byte
-        count = _mm_blendv_epi8(count, zero, cont_spots);
+        count = _mm_blendv_epi8(count, zero, is_continuation);
+        _print_mmx("count1", count);
         //count = _mm_blendv_epi8(count, zero,  cond2);
         //#count = _mm_subs_epu8(count, _mm_set1_epi8(0x1));
 
@@ -181,9 +184,40 @@ ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len, decoding_erro
         count = _mm_hadd_epi16(count, count);
         uint16_t c = _mm_extract_epi16(count, 0);
 
-        num_codepoints += (c & 0xff) + ((c >> 8) & 0xff);
-        len -= 16;
-        encoded += 16;
+        // these cases need to be handled:
+        //                      16 byte boundary -> | <- 16 byte boundary
+        // -----------------------------------------+--------------------
+        // 1) 2 byte code point. e.g. ...  c2       | 80 ...
+        // 2) 3 byte code point. e.g. ...  e6       | 80 80 ...
+        // 3) 3 byte code point. e.g. ...  e6 80    | 80 ...
+        // 4) 4 byte code point. e.g. ...  f2       | 80 80 80 ...
+        // 5) 4 byte code point. e.g. ...  f2 80    | 80 80 ...
+        // 6) 4 byte code point. e.g. ...  f2 80 80 | 80 ...
+        //
+        int mask_chunk = _mm_movemask_epi8(chunk);
+        int mask_conti = _mm_movemask_epi8(is_continuation);
+        printf("%x %x\n", mask_chunk, mask_conti);
+
+        // little endian case:
+        int lenoff = 16;
+        int minus_codepoints = 0;
+        printf("1 == %d, 0 == %d\n",BIT(0x8000, 16), BIT(0x8fff, 15));
+        if (BIT(mask_chunk, 16) != 0 && BIT(mask_conti, 16) == 0) { // 1)
+            minus_codepoints = 1;
+            lenoff -= 1;
+            // TODO 2)
+        } else if (BIT(mask_chunk, 15) != 0 && BIT(mask_conti, 16) == 1) { // 3)
+            minus_codepoints = 1;
+            lenoff -= 2;
+        } else if (BIT(mask_chunk, 14) != 0 && BIT(mask_conti, 15) == 1 &&
+                   BIT(mask_conti, 16) == 1) { // 6)
+            minus_codepoints = 1;
+            lenoff -= 3;
+        }
+
+        num_codepoints += (c & 0xff) + ((c >> 8) & 0xff) - minus_codepoints;
+        len -= lenoff;
+        encoded += lenoff;
     }
 
     if (len == 0) {
@@ -261,3 +295,31 @@ ssize_t count_utf8_codepoints_slow(const uint8_t * encoded, size_t len, decoding
     }
     return num_codepoints;
 }
+
+#ifdef BENCHMARKS
+#include <time.h>
+
+// really a micro benchmark
+double _bench_seq(char * bytes, int len, ssize_t * count, int times)
+{
+    clock_t start = clock();
+    for (int i = 0; i < times; i++) {
+        count_utf8_codepoints((const uint8_t*)bytes, len, NULL);
+    }
+    clock_t end = clock();
+    clock_t time = end-start;
+    return time / CLOCKS_PER_SEC;
+}
+
+double _bench_seq(char * bytes, int len, ssize_t * count, int times)
+{
+    clock_t start = clock();
+    for (int i = 0; i < times; i++) {
+        count_utf8_codepoints((const uint8_t*)bytes, len, NULL);
+    }
+    clock_t end = clock();
+    clock_t time = end-start;
+    return time / CLOCKS_PER_SEC;
+}
+
+#endif

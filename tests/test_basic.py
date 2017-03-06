@@ -66,6 +66,18 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
         check = lambda b: self.lib.count_utf8_codepoints(b, len(b), error)
 
         #ss = b'\xe0\xa0\x80'+b'\xe0\xa0\x80'+b'\xf8\x8f\x80\x80'+b'\xed\x9f\x80\x00\xc2\x80'
-        ss = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x80\x00\x00'
+        ss = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xc2\x80'
+        result, bytestring = _utf8_check(ss)
+        assert check(bytestring) == result
+
+        ss = b'\x00'*15 + b'\xe2\x80\x80'
+        result, bytestring = _utf8_check(ss)
+        assert check(bytestring) == result
+
+        ss = b'\x00'*13 + b'\xf2\x80\x80\x80'
+        result, bytestring = _utf8_check(ss)
+        assert check(bytestring) == result
+
+        ss = b'\x00'*14 + b'\xe2\x80\x80'
         result, bytestring = _utf8_check(ss)
         assert check(bytestring) == result
