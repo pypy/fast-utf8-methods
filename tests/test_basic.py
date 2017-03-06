@@ -70,6 +70,11 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
         result, bytestring = _utf8_check(ss)
         assert check(bytestring) == result
 
+    def test_boundary_cases(self):
+        error = self.ffi.new("decoding_error_t[1]")
+
+        check = lambda b: self.lib.count_utf8_codepoints(b, len(b), error)
+
         ss = b'\x00'*15 + b'\xe2\x80\x80'
         result, bytestring = _utf8_check(ss)
         assert check(bytestring) == result
