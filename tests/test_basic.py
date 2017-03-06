@@ -69,7 +69,7 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
         check = lambda b: self.lib.count_utf8_codepoints(b, len(b), error)
 
         #ss = '\xed\xa0\x80''\x00\x00\x00''\xf0\xa2\xad\x83''\x00\x00\x00\x00''\xc2\x80'
-        ss = b'\xe6\x80\x80'+b'\xe0\xa0\x80'+b'\xf2\x80\x80\x80'+b'\x00\x00\x00\x00\xc2\x80'
+        ss = b'\xe0\xa0\x80'+b'\xe0\xa0\x80'+b'\xf2\x80\x80\x80'+b'\xed\x9f\x80\x00\xc2\x80'
         result, bytestring = _utf8_check(ss)
         assert check(bytestring) == result
 

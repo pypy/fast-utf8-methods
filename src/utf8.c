@@ -89,37 +89,31 @@ ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len, decoding_erro
 
             contbytes = _mm_or_si128(contbytes, state3);
 
-            // verify that there are now surrogates
+            // range check
             __m128i equal_e0 = _mm_cmpeq_epi8(_mm_blendv_epi8(zero, chunk_signed, istate3),
                                               _mm_set1_epi8(0xe0-0x80));
             if (_mm_movemask_epi8(equal_e0) != 0) {
-                _print_mmx("cccc0", equal_e0);
-                __m128i b = _mm_blendv_epi8(zero, chunk, _mm_slli_si128(istate3, 1));
-                _print_mmx("ccccb", b);
-                __m128i check_surrogate = _mm_cmplt_epi8(b, _mm_set1_epi8(0xa0-0x80));
+                __m128i mask = _mm_blendv_epi8(_mm_set1_epi8(0x7f), chunk_signed, _mm_slli_si128(equal_e0, 1));
+                __m128i check_surrogate = _mm_cmplt_epi8(mask, _mm_set1_epi8(0xa0-0x80));
                 if (_mm_movemask_epi8(check_surrogate) != 0) {
                     // invalid surrograte character!!!
+                    _print_mmx("ccccd", check_surrogate);
                     return -1;
                 }
             }
 
+            // verify that there are now surrogates
             if (!ALLOW_SURROGATES) {
                 __m128i equal_ed = _mm_cmpeq_epi8(_mm_blendv_epi8(zero, chunk_signed, istate3),
                                                   _mm_set1_epi8(0xed-0x80));
                 if (_mm_movemask_epi8(equal_ed) != 0) {
-                    _print_mmx("ccccd", equal_ed);
-                    __m128i check_surrogate = _mm_cmpgt_epi8(_mm_slli_si128(istate3, 1), _mm_set1_epi8(0x9f-0x80));
+                    __m128i mask = _mm_blendv_epi8(_mm_set1_epi8(0x80), chunk_signed, _mm_slli_si128(equal_ed, 1));
+                    __m128i check_surrogate = _mm_cmpgt_epi8(mask, _mm_set1_epi8(0xa0-1-0x80));
                     if (_mm_movemask_epi8(check_surrogate) != 0) {
                         // invalid surrograte character!!!
                         return -1;
                     }
                 }
-
-
-                //if ((byte == 0xe0 && byte1 < 0xa0) ||
-                //    (byte == 0xed && byte1 > 0x9f && !ALLOW_SURROGATES)) {
-                //    return -1;
-                //}
             }
         }
         if (_mm_movemask_epi8(fourbytemarker) != 0) {
