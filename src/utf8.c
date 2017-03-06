@@ -79,28 +79,78 @@ ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len, decoding_erro
         }
 
         __m128i state2 = _mm_andnot_si128(threebytemarker, twobytemarker);
-        state2 = _mm_slli_si128(_mm_blendv_epi8(state2, one, twobytemarker), 1);
+        __m128i contbytes = _mm_slli_si128(_mm_blendv_epi8(state2, one, twobytemarker), 1);
 
-        __m128i state3 = _mm_andnot_si128(fourbytemarker, threebytemarker);
-        state3 = _mm_slli_si128(_mm_blendv_epi8(zero, _mm_set1_epi8(0x3), state3), 1);
-        state3 = _mm_or_si128(state3, _mm_slli_si128(state3, 1));
+        if (_mm_movemask_epi8(threebytemarker) != 0) {
+            // contain a 3 byte marker
+            __m128i istate3 = _mm_andnot_si128(fourbytemarker, threebytemarker);
+            __m128i state3 = _mm_slli_si128(_mm_blendv_epi8(zero, _mm_set1_epi8(0x3), istate3), 1);
+            state3 = _mm_or_si128(state3, _mm_slli_si128(state3, 1));
 
-        __m128i istate4 = _mm_slli_si128(_mm_blendv_epi8(zero, _mm_set1_epi8(0x7), fourbytemarker), 1);
-        __m128i state4 =_mm_or_si128(istate4, _mm_slli_si128(istate4, 1));
-        state4 =_mm_or_si128(state4, _mm_slli_si128(istate4, 2));
+            contbytes = _mm_or_si128(contbytes, state3);
 
-        __m128i contbytes = _mm_or_si128(state2, state3);
-        contbytes = _mm_or_si128(contbytes, state4);
+            // verify that there are now surrogates
+            __m128i equal_e0 = _mm_cmpeq_epi8(_mm_blendv_epi8(zero, chunk_signed, istate3),
+                                              _mm_set1_epi8(0xe0-0x80));
+            if (_mm_movemask_epi8(equal_e0) != 0) {
+                _print_mmx("cccc0", equal_e0);
+                __m128i b = _mm_blendv_epi8(zero, chunk, _mm_slli_si128(istate3, 1));
+                _print_mmx("ccccb", b);
+                __m128i check_surrogate = _mm_cmplt_epi8(b, _mm_set1_epi8(0xa0-0x80));
+                if (_mm_movemask_epi8(check_surrogate) != 0) {
+                    // invalid surrograte character!!!
+                    return -1;
+                }
+            }
+
+            if (!ALLOW_SURROGATES) {
+                __m128i equal_ed = _mm_cmpeq_epi8(_mm_blendv_epi8(zero, chunk_signed, istate3),
+                                                  _mm_set1_epi8(0xed-0x80));
+                if (_mm_movemask_epi8(equal_ed) != 0) {
+                    _print_mmx("ccccd", equal_ed);
+                    __m128i check_surrogate = _mm_cmpgt_epi8(_mm_slli_si128(istate3, 1), _mm_set1_epi8(0x9f-0x80));
+                    if (_mm_movemask_epi8(check_surrogate) != 0) {
+                        // invalid surrograte character!!!
+                        return -1;
+                    }
+                }
+
+
+                //if ((byte == 0xe0 && byte1 < 0xa0) ||
+                //    (byte == 0xed && byte1 > 0x9f && !ALLOW_SURROGATES)) {
+                //    return -1;
+                //}
+            }
+        }
+        if (_mm_movemask_epi8(fourbytemarker) != 0) {
+            // contain a 4 byte marker
+            __m128i istate4 = _mm_slli_si128(_mm_blendv_epi8(zero, _mm_set1_epi8(0x7), fourbytemarker), 1);
+            __m128i state4 =_mm_or_si128(istate4, _mm_slli_si128(istate4, 1));
+            state4 =_mm_or_si128(state4, _mm_slli_si128(istate4, 2));
+
+            contbytes = _mm_or_si128(contbytes, state4);
+        }
 
         __m128i check_cont = _mm_cmpgt_epi8(contbytes, zero);
         __m128i contpos = _mm_and_si128(_mm_set1_epi8(0xc0), chunk);
         contpos = _mm_cmpeq_epi8(_mm_set1_epi8(0x80), contpos);
         __m128i validcont = _mm_xor_si128(check_cont, contpos);
-        _print_mmx("aaa", validcont);
+        _print_mmx("endcheck", validcont);
         if (_mm_movemask_epi8(validcont) == 1) {
             // uff, nope, that is really not utf8
             return -1;
         }
+
+        //const int check_mode = _SIDD_UBYTE_OPS | _SIDD_CMP_RANGES;
+        //__m128i m = _mm_cvtsi64_si128(0xfdeffdd0fffffffe);
+        //_print_mmx("lo", m);
+        //if (_mm_cmpestrc(_mm_cvtsi64_si128(0xfdeffdd0fffffffe), 4, chunk, 8, check_mode) |
+        //    _mm_cmpestrc(_mm_cvtsi64_si128(0xfdeffdd0fffffffe), 4, chunk, 8, check_mode)) {
+        //    return -1;
+        //}
+
+
+
 
         // CORRECT, calculate the length
         __m128i count = _mm_set1_epi8(0xc1);
