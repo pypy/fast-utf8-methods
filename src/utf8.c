@@ -44,11 +44,13 @@ ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len, decoding_erro
         return 0;
     }
     __m128i zero = _mm_set1_epi8(0x00);
+    __m128i one = _mm_set1_epi8(0x1);
 
     printf("%ld\n", len);
     while (len >= 16) {
         chunk = _mm_loadu_si128((__m128i*)encoded);
         if (_mm_movemask_epi8(chunk) == 0) {
+            // valid ascii chars!
             len -= 16;
             encoded += 16;
             num_codepoints += 16;
@@ -56,29 +58,51 @@ ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len, decoding_erro
         }
 
         _print_mmx("chunk", chunk);
-        // fight agains the fact that there is no comparison on unsigned values
+        // fight against the fact that there is no comparison on unsigned values
         __m128i chunk_signed = _mm_add_epi8(chunk, _mm_set1_epi8(0x80));
         _print_mmx("shunk", chunk_signed);
-        __m128i state = _mm_set1_epi8(0x0 | 0x80);
-        __m128i cond2 = _mm_cmplt_epi8(_mm_set1_epi8(0xc2-1-0x80), chunk_signed);
-        _print_mmx("cond2", cond2);
 
-        printf("blending\n");
-        state = _mm_blendv_epi8(state, _mm_set1_epi8(0xc2),  cond2);
-        _print_mmx("state", state);
+        // ERROR checking
+        // checking procedure works the following way:
+        //
+        // 1) mark all continuation bytes with either 0x1, 0x3, 0x7 (one, two or three bytes continuation)
+        // 2) then check that there is no byte that has an invalid continuation
+        __m128i twobytemarker = _mm_cmplt_epi8(_mm_set1_epi8(0xc0-1-0x80), chunk_signed);
+        __m128i threebytemarker = _mm_cmplt_epi8(_mm_set1_epi8(0xe0-1-0x80), chunk_signed);
+        __m128i fourbytemarker = _mm_cmplt_epi8(_mm_set1_epi8(0xf0-0x80), chunk_signed);
 
-        //__m128i only_2byte = _mm_cmplt_epi8( _mm_set1_epi8(0xe0-1 -0x80), chunk_signed);
-        //_print_mmx("2byte", only_2byte);
+        // check that 0xc0 > 0xc2
+        __m128i validtwobm = _mm_cmplt_epi8(_mm_set1_epi8(0xc2-1-0x80), chunk_signed);
+        if (_mm_movemask_epi8(_mm_xor_si128(validtwobm, twobytemarker)) != 0) {
+            // two byte marker should not be in range [0xc0-0xc2)
+            return -1;
+        }
 
-        //if (!_mm_movemask_epi8(only_2byte)) {
-        //    len -= 16;
-        //    encoded += 16;
-        //    num_codepoints += 8;
-        //    continue;
-        //}
+        __m128i state2 = _mm_andnot_si128(threebytemarker, twobytemarker);
+        state2 = _mm_slli_si128(_mm_blendv_epi8(state2, one, twobytemarker), 1);
 
+        __m128i state3 = _mm_andnot_si128(fourbytemarker, threebytemarker);
+        state3 = _mm_slli_si128(_mm_blendv_epi8(zero, _mm_set1_epi8(0x3), state3), 1);
+        state3 = _mm_or_si128(state3, _mm_slli_si128(state3, 1));
 
-        // this is correct, compute the length
+        __m128i istate4 = _mm_slli_si128(_mm_blendv_epi8(zero, _mm_set1_epi8(0x7), fourbytemarker), 1);
+        __m128i state4 =_mm_or_si128(istate4, _mm_slli_si128(istate4, 1));
+        state4 =_mm_or_si128(state4, _mm_slli_si128(istate4, 2));
+
+        __m128i contbytes = _mm_or_si128(state2, state3);
+        contbytes = _mm_or_si128(contbytes, state4);
+
+        __m128i check_cont = _mm_cmpgt_epi8(contbytes, zero);
+        __m128i contpos = _mm_and_si128(_mm_set1_epi8(0xc0), chunk);
+        contpos = _mm_cmpeq_epi8(_mm_set1_epi8(0x80), contpos);
+        __m128i validcont = _mm_xor_si128(check_cont, contpos);
+        _print_mmx("aaa", validcont);
+        if (_mm_movemask_epi8(validcont) == 1) {
+            // uff, nope, that is really not utf8
+            return -1;
+        }
+
+        // CORRECT, calculate the length
         __m128i count = _mm_set1_epi8(0xc1);
         __m128i is_continuation = _mm_and_si128(_mm_set1_epi8(0xc0), chunk_signed);
         _print_mmx("iscnt", is_continuation);

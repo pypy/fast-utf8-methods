@@ -53,7 +53,7 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
         error = self.ffi.new("decoding_error_t[1]")
         assert self.lib.count_utf8_codepoints_slow(b"\xe1\x80\x80", 3, error) == 1
 
-    @given(string=st.text(min_length=16, max_length=16))
+    @given(string=st.text(min_size=16, max_size=16))
     def test_check_correct_utf8_fast(self, string):
         error = self.ffi.new("decoding_error_t[1]")
         check = lambda b: self.lib.count_utf8_codepoints(b, len(b), error)
@@ -61,15 +61,15 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
             bytestring = string.encode('utf-8')
         except UnicodeEncodeError:
             return # skip
-        result, bytestring = _utf8_check(string)
-        assert check(bytestring) == result
+        assert check(bytestring) == 16
 
     def test_test(self):
         error = self.ffi.new("decoding_error_t[1]")
 
         check = lambda b: self.lib.count_utf8_codepoints(b, len(b), error)
 
-        ss = '\xe6\x88\x91''\x00\x00\x00''\xf0\xa2\xad\x83''\x00\x00\x00\x00''\xc2\x80'
+        #ss = '\xe6\x88\x91''\x00\x00\x00''\xf0\xa2\xad\x83''\x00\x00\x00\x00''\xc2\x80'
+        ss = b'\x00\xc2\x80'+b'\xe6\x80\x80'+'\xf2\x80\x80\x80'+'\x00\x00\x00\x00\xc0\x80'
         result, bytestring = _utf8_check(ss)
         assert check(bytestring) == result
 
