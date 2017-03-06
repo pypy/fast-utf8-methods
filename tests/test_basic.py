@@ -38,47 +38,34 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
             result = -1
         assert self.lib.count_utf8_codepoints_slow(bytestring, len(bytestring), error) == result
 
-    def test_check_utf8_codepoint_range(self):
-        error = self.ffi.new("decoding_error_t[1]")
-        for i in xrange(2**32):
-            bytestring = struct.pack('I', i)
-            try:
-                decoded = bytestring.decode('utf-8')
-                result = len(decoded)
-            except UnicodeDecodeError:
-                result = -1
-            assert self.lib.count_utf8_codepoints_slow(bytestring, len(bytestring), error) == result
+    #def test_check_utf8_codepoint_range(self):
+    #    error = self.ffi.new("decoding_error_t[1]")
+    #    for i in range(2**32):
+    #        bytestring = struct.pack('I', i)
+    #        try:
+    #            decoded = bytestring.decode('utf-8')
+    #            result = len(decoded)
+    #        except UnicodeDecodeError:
+    #            result = -1
+    #        assert self.lib.count_utf8_codepoints_slow(bytestring, len(bytestring), error) == result
 
     def test_check_example(self):
         error = self.ffi.new("decoding_error_t[1]")
         assert self.lib.count_utf8_codepoints_slow(b"\xe1\x80\x80", 3, error) == 1
 
-    @given(string=st.text(min_size=16, max_size=16))
-    def test_check_correct_utf8_fast(self, string):
+    @given(bytestring=st.binary(min_size=16, max_size=16))
+    def test_check_correct_utf8_fast(self, bytestring):
         error = self.ffi.new("decoding_error_t[1]")
         check = lambda b: self.lib.count_utf8_codepoints(b, len(b), error)
-        try:
-            bytestring = string.encode('utf-8')
-        except UnicodeEncodeError:
-            return # skip
-        assert check(bytestring) == 16
+        result, bytestring = _utf8_check(bytestring)
+        assert check(bytestring) == result
 
     def test_test(self):
         error = self.ffi.new("decoding_error_t[1]")
 
         check = lambda b: self.lib.count_utf8_codepoints(b, len(b), error)
 
-        #ss = '\xed\xa0\x80''\x00\x00\x00''\xf0\xa2\xad\x83''\x00\x00\x00\x00''\xc2\x80'
-        ss = b'\xe0\xa0\x80'+b'\xe0\xa0\x80'+b'\xf2\x80\x80\x80'+b'\xed\x9f\x80\x00\xc2\x80'
+        #ss = b'\xe0\xa0\x80'+b'\xe0\xa0\x80'+b'\xf8\x8f\x80\x80'+b'\xed\x9f\x80\x00\xc2\x80'
+        ss = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x80\x00\x00'
         result, bytestring = _utf8_check(ss)
         assert check(bytestring) == result
-
-        #ss = u'ß'.encode('utf-8')
-        #assert len(ss) == 2
-        #result, bytestring = _utf8_check(ss * 8)
-        #assert check(bytestring) == result
-
-        #result, bytestring = _utf8_check("a"*16)
-        #assert check(bytestring) == result
-
-
