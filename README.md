@@ -1,3 +1,7 @@
+PyPy's utf8 utility methods
+===========================
+
+Copy u8u16 from the internet archive to the folder `thridparty/u8u16`.
 
 TODO
 ----

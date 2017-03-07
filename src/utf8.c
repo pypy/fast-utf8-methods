@@ -287,31 +287,3 @@ ssize_t count_utf8_codepoints_seq(const uint8_t * encoded, size_t len, decoding_
     }
     return num_codepoints;
 }
-
-#ifdef BENCHMARKS
-#include <time.h>
-
-// really a micro benchmark
-double _bench_seq(char * bytes, int len, ssize_t * count, int times)
-{
-    clock_t start = clock();
-    for (int i = 0; i < times; i++) {
-        count_utf8_codepoints((const uint8_t*)bytes, len, NULL);
-    }
-    clock_t end = clock();
-    clock_t time = end-start;
-    return time / CLOCKS_PER_SEC;
-}
-
-double _bench_seq(char * bytes, int len, ssize_t * count, int times)
-{
-    clock_t start = clock();
-    for (int i = 0; i < times; i++) {
-        count_utf8_codepoints((const uint8_t*)bytes, len, NULL);
-    }
-    clock_t end = clock();
-    clock_t time = end-start;
-    return time / CLOCKS_PER_SEC;
-}
-
-#endif

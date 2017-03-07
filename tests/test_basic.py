@@ -1,17 +1,8 @@
 # coding: utf-8
-import struct
-from tests.support import AbstractUnicodeTestCase
+from tests.support import AbstractUnicodeTestCase, _utf8_check
 from hypothesis import given, example
 from hypothesis import settings
 from hypothesis import strategies as st
-
-def _utf8_check(bytestring):
-    try:
-        decoded = bytestring.decode('utf-8')
-        result = len(decoded)
-    except UnicodeDecodeError:
-        result = -1
-    return result, bytestring
 
 class TestBasicFunctions(AbstractUnicodeTestCase):
     c_filename = 'utf8.c'
