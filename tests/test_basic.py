@@ -29,17 +29,6 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
             result = -1
         assert self.lib.count_utf8_codepoints_seq(bytestring, len(bytestring), error) == result
 
-    #def test_check_utf8_codepoint_range(self):
-    #    error = self.ffi.new("decoding_error_t[1]")
-    #    for i in range(2**32):
-    #        bytestring = struct.pack('I', i)
-    #        try:
-    #            decoded = bytestring.decode('utf-8')
-    #            result = len(decoded)
-    #        except UnicodeDecodeError:
-    #            result = -1
-    #        assert self.lib.count_utf8_codepoints_seq(bytestring, len(bytestring), error) == result
-
     def test_check_example(self):
         error = self.ffi.new("decoding_error_t[1]")
         assert self.lib.count_utf8_codepoints_seq(b"\xe1\x80\x80", 3, error) == 1
@@ -57,7 +46,6 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
 
         check = lambda b: self.lib.count_utf8_codepoints(b, len(b), error)
 
-        #ss = b'\xe0\xa0\x80'+b'\xe0\xa0\x80'+b'\xf8\x8f\x80\x80'+b'\xed\x9f\x80\x00\xc2\x80'
         ss = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xc2\x80'
         result, bytestring = _utf8_check(ss)
         assert check(bytestring) == result
@@ -107,3 +95,17 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
         ss = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xc2\x81\x00\x00'
         result, bytestring = _utf8_check(ss)
         assert check(bytestring) == result
+
+    # test takes very long, takes over 4 hours. assumption is that
+    # hypothesis should find those cases!
+    #def test_check_utf8_codepoint_range(self):
+    #    error = self.ffi.new("decoding_error_t[1]")
+    #    for i in range(2**32):
+    #        bytestring = struct.pack('I', i)
+    #        try:
+    #            decoded = bytestring.decode('utf-8')
+    #            result = len(decoded)
+    #        except UnicodeDecodeError:
+    #            result = -1
+    #        assert self.lib.count_utf8_codepoints_seq(bytestring, len(bytestring), error) == result
+
