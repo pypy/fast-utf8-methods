@@ -11,7 +11,8 @@ def _utf8_check(bytestring):
         result = -1
     return result, bytestring
 
-def compile_ffi(cdef, files, modulename, defines=[], includes=[], verbose=False):
+def compile_ffi(cdef, files, modulename, defines=[], includes=[],
+                verbose=False, link_flags=[]):
     ffi = FFI()
     ffi.cdef(cdef)
     directory = dirname(dirname(__file__)) # two levels below!
@@ -33,7 +34,8 @@ def compile_ffi(cdef, files, modulename, defines=[], includes=[], verbose=False)
     else:
         define_allow_surrogates = "-DALLOW_SURROGATES=0"
     ffi.set_source(modulename, source,
-            include_dirs=['src'], extra_compile_args=['-O3', define_allow_surrogates, '-msse4.1'])
+            include_dirs=['sr$'], extra_compile_args=['-O3', define_allow_surrogates, '-msse4.1'])
+            extra_compile_args=[''])
     ffi.compile(verbose=verbose)
     _test = importlib.import_module(modulename)
     return _test.ffi, _test.lib
