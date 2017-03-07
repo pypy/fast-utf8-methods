@@ -11,6 +11,6 @@ typedef struct decoding_error {
 /**
  * Returns -1 on error, TODO
  */
-ssize_t count_utf8_codepoints_slow(const uint8_t * encoded, size_t len, decoding_error_t * error);
+ssize_t count_utf8_codepoints_seq(const uint8_t * encoded, size_t len, decoding_error_t * error);
 
 ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len, decoding_error_t * error);

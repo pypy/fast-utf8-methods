@@ -155,28 +155,18 @@ ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len, decoding_erro
         __m128i check_cont = _mm_cmpgt_epi8(contbytes, zero);
         __m128i contpos = _mm_and_si128(_mm_set1_epi8(0xc0), chunk);
         contpos = _mm_cmpeq_epi8(_mm_set1_epi8(0x80), contpos);
-        //_print_mmx("contp", contpos);
-        //_print_mmx("ccont", check_cont);
         __m128i validcont = _mm_xor_si128(check_cont, contpos);
-        //_print_mmx("valid", validcont);
         if (_mm_movemask_epi8(validcont) != 0) {
             // uff, nope, that is really not utf8
             return -1;
         }
 
         // CORRECT, calculate the length
-        _print_mmx("chunk ", chunk);
         __m128i mask = _mm_and_si128(_mm_set1_epi8(0xc0), chunk_signed);
         __m128i is_continuation = _mm_cmpeq_epi8(_mm_set1_epi8(0x80-0x80), chunk_signed);
-        _print_mmx("contin", is_continuation);
-        _print_mmx("cs    ", chunk_signed);
 
-        //__m128i cond2 = _mm_cmplt_epi8(_mm_set1_epi8(0xc2-1-0x80), chunk_signed);
         // copy 0x00 over to each place which is a continuation byte
         count = _mm_blendv_epi8(count, zero, is_continuation);
-        _print_mmx("count1", count);
-        //count = _mm_blendv_epi8(count, zero,  cond2);
-        //#count = _mm_subs_epu8(count, _mm_set1_epi8(0x1));
 
         // count the code points using 2x 32 bit hadd and one last 16 hadd
         // the result will end up at the lowest position
@@ -197,20 +187,15 @@ ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len, decoding_erro
         //
         int mask_chunk = _mm_movemask_epi8(chunk);
         int mask_conti = _mm_movemask_epi8(is_continuation);
-        _print_mmx("chunk", chunk);
-        _print_mmx("icont", is_continuation);
-        printf("%x %x\n", mask_chunk, mask_conti);
 
         // little endian case:
         int lenoff = 16;
         int minus_codepoints = 0;
-        printf("1 == %d, 0 == %d\n",BIT(0x8000, 16), BIT(0x8fff, 15));
         if (BIT(mask_chunk, 16) != 0 && BIT(mask_conti, 16) == 0) { // 1)
             minus_codepoints = 1;
             lenoff -= 1;
-            // TODO 2)
         } else if (BIT(mask_chunk, 15) != 0 && BIT(mask_conti, 15) == 0 &&
-                   BIT(mask_conti, 16) == 1) { // 3)
+                   BIT(mask_conti, 16) == 1) { // 3) 2) 4)
             minus_codepoints = 1;
             lenoff -= 2;
         } else if (BIT(mask_chunk, 14) != 0 && BIT(mask_conti, 14) == 0 &&
@@ -228,7 +213,12 @@ ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len, decoding_erro
         return num_codepoints;
     }
 
-    return num_codepoints + count_utf8_codepoints_slow(encoded, len, error);
+    ssize_t result = count_utf8_codepoints_seq(encoded, len, error);
+    if (result == -1) {
+        return -1;
+    }
+
+    return num_codepoints + result;
 }
 
 int _check_continuation(const uint8_t ** encoded, const uint8_t * endptr, int count) {
@@ -248,7 +238,7 @@ int _check_continuation(const uint8_t ** encoded, const uint8_t * endptr, int co
     return 0;
 }
 
-ssize_t count_utf8_codepoints_slow(const uint8_t * encoded, size_t len, decoding_error_t * error) {
+ssize_t count_utf8_codepoints_seq(const uint8_t * encoded, size_t len, decoding_error_t * error) {
     size_t num_codepoints = 0;
     uint8_t byte = 0;
     const uint8_t * endptr = encoded + len;
