@@ -162,11 +162,8 @@ ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len, decoding_erro
         }
 
         // CORRECT, calculate the length
-        __m128i mask = _mm_and_si128(_mm_set1_epi8(0xc0), chunk_signed);
-        __m128i is_continuation = _mm_cmpeq_epi8(_mm_set1_epi8(0x80-0x80), chunk_signed);
-
         // copy 0x00 over to each place which is a continuation byte
-        count = _mm_blendv_epi8(count, zero, is_continuation);
+        count = _mm_blendv_epi8(count, zero, contpos);
 
         // count the code points using 2x 32 bit hadd and one last 16 hadd
         // the result will end up at the lowest position
@@ -186,7 +183,8 @@ ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len, decoding_erro
         // 6) 4 byte code point. e.g. ...  f2 80 80 | 80 ...
         //
         int mask_chunk = _mm_movemask_epi8(chunk);
-        int mask_conti = _mm_movemask_epi8(is_continuation);
+
+        int mask_conti = _mm_movemask_epi8(contpos);
 
         // little endian case:
         int lenoff = 16;

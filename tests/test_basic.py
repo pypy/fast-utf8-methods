@@ -27,7 +27,7 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
     int _check_continuation(const uint8_t ** encoded, const uint8_t * endptr, int count);
     """
 
-    @settings(timeout=5, max_examples=2**5)
+    @settings(timeout=5, max_examples=2**10)
     @given(st.binary())
     def test_check_utf8_seq(self, bytestring):
         error = self.ffi.new("decoding_error_t[1]")
@@ -53,7 +53,8 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
         error = self.ffi.new("decoding_error_t[1]")
         assert self.lib.count_utf8_codepoints_seq(b"\xe1\x80\x80", 3, error) == 1
 
-    @given(bytestring=st.binary(min_size=16, max_size=16))
+    @settings(timeout=20, max_examples=2**32)
+    @given(bytestring=st.binary(min_size=16, max_size=64))
     def test_check_correct_utf8_fast(self, bytestring):
         error = self.ffi.new("decoding_error_t[1]")
         check = lambda b: self.lib.count_utf8_codepoints(b, len(b), error)
@@ -105,5 +106,13 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
         assert check(bytestring) == result
 
         ss = b'\x00'*14 + b'\xe0\x80'
+        result, bytestring = _utf8_check(ss)
+        assert check(bytestring) == result
+
+    def test_special_cases(self):
+        error = self.ffi.new("decoding_error_t[1]")
+        check = lambda b: self.lib.count_utf8_codepoints(b, len(b), error)
+
+        ss = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xc2\x81\x00\x00'
         result, bytestring = _utf8_check(ss)
         assert check(bytestring) == result
