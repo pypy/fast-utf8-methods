@@ -20,19 +20,25 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
     int _check_continuation(const uint8_t ** encoded, const uint8_t * endptr, int count);
     """
 
-    def test_u6u18(self):
-        error = self.ffi.new("decoding_error_t[1]")
-        check = lambda b: self.lib.count_utf8_codepoints(b, len(b), error)
-
+    def setup_class(clz):
+        AbstractUnicodeTestCase.setup_class(clz)
         path = join(getcwd(), 'thirdparty','u8u16','QA','TestFiles')
         assert exists(path), "please see section in readme on how to download u8u16"
+        clz.test_files = []
         for root, dirs, files in walk(path):
             del dirs[:]
             for file in files:
-                print("checking file", file)
-                with open(join(root, file), 'rb') as fd:
-                    bytestring = fd.read()
-                    result, bytestring = _utf8_check(bytestring)
-                    assert check(bytestring) == result
+                clz.test_files.append(join(root, file))
 
+    @given(st.data())
+    def test_u6u18(self, data):
+        error = self.ffi.new("decoding_error_t[1]")
+        check = lambda b: self.lib.count_utf8_codepoints(b, len(b), error)
+        for path in self.test_files:
+                with open(path, 'rb') as fd:
+                    bytestring = fd.read()
+                    a = data.draw(st.integers(min_value=0, max_value=len(bytestring)))
+                    b = data.draw(st.integers(min_value=a, max_value=len(bytestring)))
+                    result, bytestring = _utf8_check(bytestring[a:b])
+                    assert check(bytestring) == result
 
