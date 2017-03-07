@@ -1,5 +1,7 @@
-#include <time.h>
+#include "bench.h"
 
+#include "utf8.h"
+#include <time.h>
 #include <stdint.h>
 
 // copied from u6u18 to count cycles on x86
@@ -14,8 +16,15 @@ unsigned long long _bench_seq(const uint8_t * bytes, int len)
 {
     unsigned long long cycs;
     cycs = read_cycle_counter();
-    count_utf8_codepoints(bytes, len, NULL);
+    count_utf8_codepoints_seq(bytes, len, NULL);
     return read_cycle_counter() - cycs;
 }
 
+unsigned long long _bench_vec(const uint8_t * bytes, int len)
+{
+    unsigned long long cycs;
+    cycs = read_cycle_counter();
+    count_utf8_codepoints(bytes, len, NULL);
+    return read_cycle_counter() - cycs;
+}
 
