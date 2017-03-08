@@ -34,9 +34,9 @@ def compile_ffi(cdef, files, modulename, defines=[], includes=[],
     else:
         define_allow_surrogates = "-DALLOW_SURROGATES=0"
     ffi.set_source(modulename, source,
-            include_dirs=['sr$'], extra_compile_args=['-O3', define_allow_surrogates, '-msse4.1'])
-            extra_compile_args=[''])
-    ffi.compile(verbose=verbose)
+            include_dirs=['src'], extra_compile_args=['-O3', define_allow_surrogates],
+            extra_objects=['src/utf8-sse4.o','src/utf8-avx.o'])
+    ffi.compile(verbose=True)
     _test = importlib.import_module(modulename)
     return _test.ffi, _test.lib
 
@@ -49,3 +49,11 @@ class AbstractUnicodeTestCase(object):
         ffi, lib = compile_ffi(clz.cdef, clz.c_filename, modulename)
         clz.ffi = ffi
         clz.lib = lib
+
+    def check(self, bytestring):
+        seq = self.lib.count_utf8_codepoints(bytestring, len(bytestring))
+        generic = self.lib.count_utf8_codepoints(bytestring, len(bytestring))
+        sse = self.lib.count_utf8_codepoints_sse4(bytestring, len(bytestring))
+        avx = self.lib.count_utf8_codepoints_avx(bytestring, len(bytestring))
+        assert seq == generic == sse
+        return seq

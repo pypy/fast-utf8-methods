@@ -9,15 +9,11 @@ from os.path import join, exists
 class TestBasicFunctions(AbstractUnicodeTestCase):
     c_filename = 'utf8.c'
     cdef = """
-    typedef struct decoding_error {
-        size_t start;
-        size_t end;
-        int reason_index;
-    } decoding_error_t;
-
-    ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len, decoding_error_t * error);
-    ssize_t count_utf8_codepoints_seq(const uint8_t * encoded, size_t len, decoding_error_t * error);
+    ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len);
+    ssize_t count_utf8_codepoints_seq(const uint8_t * encoded, size_t len);
     int _check_continuation(const uint8_t ** encoded, const uint8_t * endptr, int count);
+    extern ssize_t count_utf8_codepoints_sse4(const uint8_t * encoded, size_t len);
+    extern ssize_t count_utf8_codepoints_avx(const uint8_t * encoded, size_t len);
     """
 
     def setup_class(clz):
@@ -31,14 +27,12 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
                 clz.test_files.append(join(root, file))
 
     @given(st.data())
-    def test_u6u18(self, data):
-        error = self.ffi.new("decoding_error_t[1]")
-        check = lambda b: self.lib.count_utf8_codepoints(b, len(b), error)
+    def test_u8u16(self, data):
         for path in self.test_files:
                 with open(path, 'rb') as fd:
                     bytestring = fd.read()
                     a = data.draw(st.integers(min_value=0, max_value=len(bytestring)))
                     b = data.draw(st.integers(min_value=a, max_value=len(bytestring)))
                     result, bytestring = _utf8_check(bytestring[a:b])
-                    assert check(bytestring) == result
+                    assert self.check(bytestring) == result
 

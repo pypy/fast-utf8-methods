@@ -24,8 +24,6 @@ __inline__ unsigned long long int read_cycle_counter () {
 }
 #endif
 
-
-
 unsigned long long _bench_seq(const uint8_t * bytes, int len)
 {
     CLOCK_DEFS;

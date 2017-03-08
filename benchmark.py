@@ -54,10 +54,12 @@ def run_file(runner, name, filename):
         data = fd.read()
         runner.bench_sample_func('pypy-seq-'+name, run, data, lib._bench_seq, inner_loops=10)
         runner.bench_sample_func('pypy-vec-'+name, run, data, lib._bench_vec, inner_loops=10)
-        runner.bench_sample_func('pypy-libunistring-'+name, run, data, lib._bench_libunistring, inner_loops=10)
+        runner.bench_sample_func('libunistring-'+name, run, data, lib._bench_libunistring, inner_loops=10)
         # Just length checking, no validation http://www.daemonology.net/blog/2008-06-05-faster-utf8-strlen.html
-        runner.bench_sample_func('pypy-mystrlenutf8-'+name, run, data, lib._bench_mystringlenutf8, inner_loops=10)
+        runner.bench_sample_func('mystrlenutf8-'+name, run, data, lib._bench_mystringlenutf8, inner_loops=10)
 
 runner = perf.Runner()
 # a news website containing german umlauts and some other unicode chars, but expected mostly ascii
-run_file(runner, 'news-de', 'tests/html/derstandard.at.html')
+#run_file(runner, 'news-de', 'tests/html/derstandard.at.html')
+run_file(runner, 'news-cn', 'tests/html/worldjournal.cn.html')
+#run_file(runner, 'tipitaka-thai', 'tests/html/tipitaka-thai.html')
