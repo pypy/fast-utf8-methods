@@ -7,7 +7,8 @@
 
 int instruction_set = -1;
 #define ISET_SSE4 0x1
-#define ISET_AVX2 0x2
+#define ISET_AVX 0x2
+#define ISET_AVX2 0x4
 
 void detect_instructionset(void)
 {
@@ -27,15 +28,10 @@ void detect_instructionset(void)
     if (ecx & (1<<19)) { // sse4.1
         instruction_set |= ISET_SSE4;
     }
-    op = 0x07;
-    asm ("cpuid"
-            : "=a" (eax),
-              "=b" (ebx),
-              "=c" (ecx),
-              "=d" (edx)
-            : "a" (op));
-
-    if (ebx & (1<<5)) {
+    if(__builtin_cpu_supports("avx")) {
+        instruction_set |= ISET_AVX;
+    }
+    if(__builtin_cpu_supports("avx2")) {
         instruction_set |= ISET_AVX2;
     }
 }
@@ -46,14 +42,15 @@ ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len)
         detect_instructionset();
     }
 
-    if (len >= 32 && instruction_set == ISET_AVX2) {
-        // another boost!!
+    if (len >= 32 && (instruction_set & ISET_AVX2) != 0) {
+        // to the MOON!
         return count_utf8_codepoints_avx(encoded, len);
     }
-    if (len >= 16 && instruction_set == ISET_SSE4) {
-        // speed!
+    if (len >= 16 && (instruction_set == ISET_SSE4) != 0) {
+        // speed!!
         return count_utf8_codepoints_sse4(encoded, len);
     }
 
+    // oh no, just do it sequentially!
     return count_utf8_codepoints_seq(encoded, len);
 }

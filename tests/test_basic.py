@@ -34,9 +34,10 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
         result, bytestring = _utf8_check(bytestring)
         assert self.check(bytestring) == result
 
-    def test_test(self):
-        ss = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xc2\x80'
-        result, bytestring = _utf8_check(ss)
+    @settings(timeout=20, max_examples=2**32)
+    @given(bytestring=st.binary(min_size=32, max_size=128))
+    def test_check_correct_utf8_minsize_32(self, bytestring):
+        result, bytestring = _utf8_check(bytestring)
         assert self.check(bytestring) == result
 
     def test_boundary_cases(self):
@@ -72,6 +73,11 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
 
     def test_special_cases(self):
         ss = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xc2\x81\x00\x00'
+        result, bytestring = _utf8_check(ss)
+        assert self.check(bytestring) == result
+
+    def test_test(self):
+        ss = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xc2\x80'
         result, bytestring = _utf8_check(ss)
         assert self.check(bytestring) == result
 

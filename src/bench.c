@@ -1,5 +1,3 @@
-#include "bench.h"
-
 #include <time.h>
 #include <assert.h>
 #include <stdint.h>
@@ -11,32 +9,47 @@
 typedef unsigned long long int cycles_t;
 
 #ifdef CYCLES
+typedef unsigned long long ret_t;
 #define CLOCK_DEFS cycles_t cycs;
 #define CLOCK_START cycs = read_cycle_counter()
 #define CLOCK_END read_cycle_counter() - cycs;
 
 // copied from u6u18 to count cycles on x86
 __inline__ unsigned long long int read_cycle_counter () {
+  clock_t t = clock();
   unsigned long long int ts;
   asm volatile("rdtsc\n" : 
                "=A" (ts));
   return(ts);
 }
+#else
+typedef double ret_t;
+#define CLOCK_DEFS clock_t cycs;
+#define CLOCK_START cycs = clock()
+#define CLOCK_END ((double)(clock() - cycs) / CLOCKS_PER_SEC)
 #endif
 
-unsigned long long _bench_seq(const uint8_t * bytes, int len)
+ret_t _bench_seq(const uint8_t * bytes, int len)
 {
     CLOCK_DEFS;
     CLOCK_START;
-    count_utf8_codepoints_seq(bytes, len, NULL);
+    count_utf8_codepoints_seq(bytes, len);
     return CLOCK_END;
 }
 
-unsigned long long _bench_vec(const uint8_t * bytes, int len)
+ret_t _bench_vec_sse4(const uint8_t * bytes, int len)
 {
     CLOCK_DEFS;
     CLOCK_START;
-    count_utf8_codepoints(bytes, len, NULL);
+    count_utf8_codepoints_sse4(bytes, len);
+    return CLOCK_END;
+}
+
+ret_t _bench_vec_avx2(const uint8_t * bytes, int len)
+{
+    CLOCK_DEFS;
+    CLOCK_START;
+    count_utf8_codepoints_avx(bytes, len);
     return CLOCK_END;
 }
 
@@ -96,7 +109,7 @@ u8_check (const uint8_t *s, size_t n)
   return NULL;
 }
 
-unsigned long long _bench_libunistring(const uint8_t * bytes, int len)
+ret_t _bench_libunistring(const uint8_t * bytes, int len)
 {
     CLOCK_DEFS;
     CLOCK_START;
@@ -159,7 +172,7 @@ done:
 	return ((s - _s) - count);
 }
 
-unsigned long long _bench_mystringlenutf8(const uint8_t * bytes, int len)
+ret_t _bench_mystringlenutf8(const uint8_t * bytes, int len)
 {
     CLOCK_DEFS;
 
