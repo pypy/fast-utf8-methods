@@ -54,3 +54,30 @@ ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len)
     // oh no, just do it sequentially!
     return count_utf8_codepoints_seq(encoded, len);
 }
+
+ssize_t byte_position_at_index_utf8(size_t index, const uint8_t * utf8, size_t len, uint8_t ** table, int * table_size)
+{
+    size_t code_point_index = 0;
+    uint8_t * utf8_start_position = utf8;
+
+    while (1) {
+        if (code_point_index == index) {
+            return utf8 - utf8_start_position;
+        }
+
+        uint8_t c = *utf8++;
+        if ((c & 0xc0) == 0) {
+            code_point_index += 1;
+            continue;
+        }
+        if ((c & 0xe0) == 0xc0) {
+            code_point_index += 1;
+            utf8 += 2;
+            continue;
+        }
+
+        utf8++;
+    }
+
+    return -1;
+}
