@@ -64,10 +64,11 @@ typedef struct fu8_idxtab {
 
 fu8_idxtab_t * _fu8_alloc_idxtab(int strlen)
 {
-    if (strlen <= 1) {
+    if (strlen <= 32) {
         return NULL;
     }
-    return (fu8_idxtab_t*)calloc(sizeof(fu8_idxtab_t), 1);
+    fu8_idxtab_t * c = (fu8_idxtab_t*)calloc(sizeof(fu8_idxtab_t), 1);
+    return c;
 }
 
 void fu8_free_idxtab(struct fu8_idxtab * t)
@@ -78,18 +79,29 @@ void fu8_free_idxtab(struct fu8_idxtab * t)
     free(t); t = NULL;
 }
 
-
-ssize_t fu8_idx2bytepos(size_t index,
-                        const uint8_t * utf8, size_t len,
-                        struct fu8_idxtab ** tab)
+#define FU8_ITAB_STEP(len) len / 16
+void _fu8_itab_set_bucket(struct fu8_idxtab * tab, int bucket, size_t len)
 {
+    assert(bucket < 16 && "bucket must be less than 16");
+    assert(bucket >= 0 && "bucket must be a positive integer");
+    tab->tab[bucket] = (size_t)len;
+}
+
+ssize_t _fu8_build_idxtab(size_t cpidx, const uint8_t * utf8, size_t len,
+                          struct fu8_idxtab * tab) {
     size_t code_point_index = 0;
     const uint8_t * utf8_start_position = utf8;
     const uint8_t * utf8_end_position = utf8 + len;
+    int bucket_step = FU8_ITAB_STEP(len);
+    int bucket = 0;
 
     while (utf8 < utf8_end_position) {
-        if (code_point_index == index) {
+        if (code_point_index == cpidx) {
             return utf8 - utf8_start_position;
+        }
+
+        if (code_point_index != 0 && (code_point_index % bucket_step) == 0) {
+            _fu8_itab_set_bucket(tab, bucket++, utf8 - utf8_start_position);
         }
 
         uint8_t c = *utf8++;
@@ -111,5 +123,29 @@ ssize_t fu8_idx2bytepos(size_t index,
         }
     }
 
-    return -1;
+    return -1; // out of bounds!!
+}
+
+ssize_t _fu8_build_idxtab(size_t cpidx, const uint8_t * utf8, size_t len,
+                          struct fu8_idxtab * tab) {
+    //tab->tab[tab->maxi]
+    return tab->tab;
+}
+
+ssize_t fu8_idx2bytepos(size_t index,
+                        const uint8_t * utf8, size_t len,
+                        struct fu8_idxtab ** tab)
+{
+    struct fu8_idxtab * itab = tab[0];
+
+    if (itab == NULL && len > 16) {
+        tab[0] = itab = _fu8_alloc_idxtab(len);
+    }
+    // note that itab STILL can be NULL
+
+    if (itab == NULL) {
+        return _fu8_build_idxtab(index, utf8, len, itab);
+    }
+
+    return _fu8_indexed_search(index, utf8, len, itab);
 }
