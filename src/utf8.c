@@ -55,28 +55,60 @@ ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len)
     return count_utf8_codepoints_seq(encoded, len);
 }
 
-ssize_t byte_position_at_index_utf8(size_t index, const uint8_t * utf8, size_t len, uint8_t ** table, int * table_size)
+typedef struct fu8_idxtab {
+    volatile int locked;
+    uint16_t tab[16];
+} fu8_idxtab_t;
+
+#include <stdlib.h>
+
+fu8_idxtab_t * _fu8_alloc_idxtab(int strlen)
+{
+    if (strlen <= 1) {
+        return NULL;
+    }
+    return (fu8_idxtab_t*)calloc(sizeof(fu8_idxtab_t), 1);
+}
+
+void fu8_free_idxtab(struct fu8_idxtab * t)
+{
+    // why manage this in C?
+    // it might at some point have a dynamic table inside fu8_idxtab_t,
+    // then we can handle this easily here without modifying the API
+    free(t); t = NULL;
+}
+
+
+ssize_t fu8_idx2bytepos(size_t index,
+                        const uint8_t * utf8, size_t len,
+                        struct fu8_idxtab ** tab)
 {
     size_t code_point_index = 0;
-    uint8_t * utf8_start_position = utf8;
+    const uint8_t * utf8_start_position = utf8;
+    const uint8_t * utf8_end_position = utf8 + len;
 
-    while (1) {
+    while (utf8 < utf8_end_position) {
         if (code_point_index == index) {
             return utf8 - utf8_start_position;
         }
 
         uint8_t c = *utf8++;
+        code_point_index += 1;
         if ((c & 0xc0) == 0) {
-            code_point_index += 1;
             continue;
         }
         if ((c & 0xe0) == 0xc0) {
-            code_point_index += 1;
+            utf8 += 1;
+            continue;
+        }
+        if ((c & 0xf0) == 0xe0) {
             utf8 += 2;
             continue;
         }
-
-        utf8++;
+        if ((c & 0xf7) == 0xf0) {
+            utf8 += 3;
+            continue;
+        }
     }
 
     return -1;

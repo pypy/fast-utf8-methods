@@ -229,3 +229,10 @@ ssize_t count_utf8_codepoints_sse4(const uint8_t * encoded, size_t len)
 
     return num_codepoints + result;
 }
+
+ssize_t fu8_idx2bytepos_sse4(size_t index,
+                             const uint8_t * utf8, size_t len,
+                             struct fu8_idxtab * t)
+{
+    return 0;
+}
