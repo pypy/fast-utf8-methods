@@ -45,11 +45,11 @@ double _bench_mystringlenutf8(const uint8_t * bytes, int len);
 
 
 def run(loops, data, func):
-    cycles = 0
+    clock = 0
     for i in range(loops):
-        cycs = func(data, len(data))
-        cycles += cycs
-    return cycles
+        c = func(data, len(data))
+        clock += c
+    return clock
 
 def run_file(runner, name, filename):
     with open(filename, 'rb') as fd:
