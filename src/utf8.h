@@ -41,8 +41,10 @@ struct fu8_idxtab;
  * table to speed up indexing.
  *
  */
-ssize_t fu8_idx2bytepos(size_t index, const uint8_t * utf8, size_t len,
-                        struct fu8_idxtab ** t);
+ssize_t fu8_idx2bytepos(size_t index,
+                        const uint8_t * utf8, size_t bytelen,
+                        size_t cplen,
+                        struct fu8_idxtab ** tab);
 void fu8_free_idxtab(struct fu8_idxtab * t);
 ssize_t fu8_idx2bytepso_sse4(size_t index,
                              const uint8_t * utf8, size_t len,

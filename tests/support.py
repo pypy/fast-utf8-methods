@@ -34,7 +34,7 @@ def compile_ffi(cdef, files, modulename, defines=[], includes=[],
     else:
         define_allow_surrogates = "-DALLOW_SURROGATES=0"
     ffi.set_source(modulename, source,
-            include_dirs=['src'], extra_compile_args=['-O3', define_allow_surrogates],
+            include_dirs=['src'], extra_compile_args=['-O3', define_allow_surrogates, '-g'],
             extra_objects=['src/utf8-sse4.o','src/utf8-avx.o'])
     ffi.compile(verbose=True)
     _test = importlib.import_module(modulename)
