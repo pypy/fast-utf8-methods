@@ -73,7 +73,7 @@ fu8_idxtab_t * _fu8_alloc_idxtab(int cp_count, int character_step)
     char * c = calloc(sizeof(fu8_idxtab_t)+s, 1);
     fu8_idxtab_t * i = (fu8_idxtab_t*)c;
     i->character_step = character_step;
-    i->byte_positions = (size_t*)c + sizeof(fu8_idxtab_t);
+    i->byte_positions = (size_t*)(c + sizeof(fu8_idxtab_t));
     return i;
 }
 
@@ -109,7 +109,7 @@ ssize_t _fu8_build_idxtab(size_t cpidx, size_t index_off,
     if (itab) {
         bucket_step = itab->character_step;
         bucket = index_off / bucket_step;
-        printf("step %d/%d bucket ioff %ld\n", bucket, bucket_step, index_off);
+        //printf("step %d/%d bucket ioff %ld\n", bucket, bucket_step, index_off);
     }
 
     while (utf8 < utf8_end_position) {
@@ -160,7 +160,7 @@ ssize_t _fu8_idx2bytepos(size_t index, size_t index_off,
         return _fu8_build_idxtab(index, index_off, utf8, bytelen, cplen, tab);
     }
     size_t off = _fu8_idxtab_lookup_bytepos_i(tab[0], index);
-    printf("found %llx\n", off);
+    //printf("found %llx\n", off);
     return _fu8_build_idxtab(index, off, utf8, bytelen, cplen, tab);
 }
 
@@ -174,7 +174,7 @@ size_t _fu8_idxtab_lookup_bytepos_i(struct fu8_idxtab * tab, size_t cpidx)
     size_t val = tab->byte_positions[tidx];
     while (tidx > 0) {
         if (val != 0) {
-            printf("%llx at %d\n", val, tidx);
+            //printf("%llx at %d %d/%d\n", val, tidx, cpidx, step);
             return val;
         }
         tidx--;
