@@ -14,7 +14,6 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
     extern ssize_t count_utf8_codepoints_avx(const uint8_t * encoded, size_t len);
     """
 
-
     @settings(timeout=5, max_examples=2**10)
     @given(st.binary())
     def test_check_utf8_seq(self, bytestring):

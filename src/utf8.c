@@ -108,19 +108,23 @@ ssize_t _fu8_build_idxtab(size_t cpidx, size_t index_off,
     int bucket = -1;
     if (itab) {
         bucket_step = itab->character_step;
-        index_off / bucket_step;
+        bucket = index_off / bucket_step;
+        printf("step %d/%d bucket ioff %ld\n", bucket, bucket_step, index_off);
     }
 
     while (utf8 < utf8_end_position) {
+        //printf("%d %llx ok\n", code_point_index, utf8);
         if (code_point_index == cpidx) {
+            //printf("return %llx %llx %llx\n", utf8_start_position, utf8, utf8_end_position);
             return utf8 - utf8_start_position;
         }
 
         if (bucket_step != -1 && code_point_index != 0 && (code_point_index % bucket_step) == 0) {
-            _fu8_itab_set_bucket(tab, bucket++, utf8 - utf8_start_position, code_point_index);
+            _fu8_itab_set_bucket(itab, bucket++, utf8 - utf8_start_position, code_point_index);
         }
 
         uint8_t c = *utf8++;
+        //printf("%x\n", c);
         code_point_index += 1;
         if ((c & 0xc0) == 0) {
             continue;
@@ -133,7 +137,7 @@ ssize_t _fu8_build_idxtab(size_t cpidx, size_t index_off,
             utf8 += 2;
             continue;
         }
-        if ((c & 0xf7) == 0xf0) {
+        if ((c & 0xf8) == 0xf0) {
             utf8 += 3;
             continue;
         }
@@ -156,6 +160,7 @@ ssize_t _fu8_idx2bytepos(size_t index, size_t index_off,
         return _fu8_build_idxtab(index, index_off, utf8, bytelen, cplen, tab);
     }
     size_t off = _fu8_idxtab_lookup_bytepos_i(tab[0], index);
+    printf("found %llx\n", off);
     return _fu8_build_idxtab(index, off, utf8, bytelen, cplen, tab);
 }
 
@@ -169,6 +174,7 @@ size_t _fu8_idxtab_lookup_bytepos_i(struct fu8_idxtab * tab, size_t cpidx)
     size_t val = tab->byte_positions[tidx];
     while (tidx > 0) {
         if (val != 0) {
+            printf("%llx at %d\n", val, tidx);
             return val;
         }
         tidx--;
@@ -229,5 +235,6 @@ ssize_t fu8_idx2bytepos(size_t index,
                         struct fu8_idxtab ** tab)
 {
     if (index == 0) { return 0; }
+    if (index >= cplen) { return -1; }
     return _fu8_idx2bytepos(index, 0, utf8, bytelen, cplen, tab);
 }
