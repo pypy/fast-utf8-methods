@@ -1,6 +1,7 @@
 #include "utf8.h"
 
 #include <stdio.h>
+#include <assert.h>
 
 #include "utf8-scalar.c" // copy code for scalar operations
 
@@ -36,7 +37,7 @@ void detect_instructionset(void)
     }
 }
 
-ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len)
+ssize_t fu8_count_utf8_codepoints(const char * utf8, ssize_t len)
 {
     if (instruction_set == -1) {
         detect_instructionset();
@@ -44,19 +45,18 @@ ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len)
 
     if (len >= 32 && (instruction_set & ISET_AVX2) != 0) {
         // to the MOON!
-        return count_utf8_codepoints_avx(encoded, len);
+        return fu8_count_utf8_codepoints_avx(utf8, len);
     }
     if (len >= 16 && (instruction_set == ISET_SSE4) != 0) {
         // speed!!
-        return count_utf8_codepoints_sse4(encoded, len);
+        return fu8_count_utf8_codepoints_sse4(utf8, len);
     }
 
     // oh no, just do it sequentially!
-    return count_utf8_codepoints_seq(encoded, len);
+    return fu8_count_utf8_codepoints_seq(utf8, len);
 }
 
 typedef struct fu8_idxtab {
-    // TODO think about locking this
     int character_step;
     size_t * byte_positions;
     size_t bytepos_table_length;
@@ -70,34 +70,38 @@ fu8_idxtab_t * _fu8_alloc_idxtab(int cp_count, int character_step)
         return NULL;
     }
     long s = (cp_count/character_step) * sizeof(size_t);
-    char * c = calloc(sizeof(fu8_idxtab_t)+s, 1);
+    char * c = calloc(1, sizeof(fu8_idxtab_t)+s);
     fu8_idxtab_t * i = (fu8_idxtab_t*)c;
     i->character_step = character_step;
     i->byte_positions = (size_t*)(c + sizeof(fu8_idxtab_t));
+    i->bytepos_table_length = cp_count/character_step;
     return i;
 }
 
 void fu8_free_idxtab(struct fu8_idxtab * t)
 {
     // why manage this in C?
-    // it might at some point have a dynamic table inside fu8_idxtab_t,
+    // it might at some point have a different data structure,
     // then we can handle this easily here without modifying the API
     free(t); t = NULL;
 }
 
-#define FU8_ITAB_STEP(len) len / 16
-void _fu8_itab_set_bucket(struct fu8_idxtab * tab, int bucket, size_t len, size_t cpidx)
+void _fu8_itab_set_bucket(struct fu8_idxtab * tab, int bucket, size_t off, size_t cpidx)
 {
-    tab->byte_positions[bucket] = (size_t)len;
+    size_t oldval = tab->byte_positions[bucket];
+    if (oldval != 0) {
+        assert(oldval != off && "table mismatch");
+    }
+    assert(bucket >= 0 && bucket < tab->bytepos_table_length && "index out of bounds");
+    tab->byte_positions[bucket] = off;
 }
 
-ssize_t _fu8_build_idxtab(size_t cpidx, size_t index_off,
-                          const uint8_t * utf8, size_t bytelen,
-                          size_t cplen,
+ssize_t _fu8_build_idxtab(size_t cpidx, size_t cpidx_off, size_t cplen,
+                          const uint8_t * utf8, size_t bytelen, size_t byteoff,
                           struct fu8_idxtab ** tab) {
-    size_t code_point_index = index_off;
-    const uint8_t * utf8_start_position = utf8;
-    const uint8_t * utf8_end_position = utf8 + bytelen;
+    size_t code_point_index = cpidx_off;
+    const uint8_t * utf8_start_position = utf8 + byteoff;
+    const uint8_t * utf8_end_position = utf8 + bytelen - byteoff;
 
     struct fu8_idxtab * itab = tab[0];
     if (itab == NULL) {
@@ -108,8 +112,8 @@ ssize_t _fu8_build_idxtab(size_t cpidx, size_t index_off,
     int bucket = -1;
     if (itab) {
         bucket_step = itab->character_step;
-        bucket = index_off / bucket_step;
-        //printf("step %d/%d bucket ioff %ld\n", bucket, bucket_step, index_off);
+        bucket = cpidx_off / bucket_step;
+        //printf("bucket %d step %d iindex_off %ld\n", bucket, bucket_step, cpidx_off);
     }
 
     while (utf8 < utf8_end_position) {
@@ -120,7 +124,7 @@ ssize_t _fu8_build_idxtab(size_t cpidx, size_t index_off,
         }
 
         if (bucket_step != -1 && code_point_index != 0 && (code_point_index % bucket_step) == 0) {
-            _fu8_itab_set_bucket(itab, bucket++, utf8 - utf8_start_position, code_point_index);
+            _fu8_itab_set_bucket(itab, bucket++, byteoff + utf8 - utf8_start_position, code_point_index);
         }
 
         uint8_t c = *utf8++;
@@ -148,7 +152,7 @@ ssize_t _fu8_build_idxtab(size_t cpidx, size_t index_off,
 
 size_t _fu8_idxtab_lookup_bytepos_i(struct fu8_idxtab * tab, size_t cpidx);
 
-ssize_t _fu8_idx2bytepos(size_t index, size_t index_off,
+ssize_t _fu8_idx2bytepos(size_t index,
                         const uint8_t * utf8, size_t bytelen, size_t cplen,
                         struct fu8_idxtab ** tab)
 {
@@ -156,17 +160,11 @@ ssize_t _fu8_idx2bytepos(size_t index, size_t index_off,
     assert(index != 0 && "index must not be 0");
     // note that itab STILL can be NULL
 
-    if (tab[0] == NULL || index_off != 0) {
-        return _fu8_build_idxtab(index, index_off, utf8, bytelen, cplen, tab);
-    }
-    size_t off = _fu8_idxtab_lookup_bytepos_i(tab[0], index);
-    //printf("found %llx\n", off);
-    return _fu8_build_idxtab(index, off, utf8, bytelen, cplen, tab);
 }
 
 size_t _fu8_idxtab_lookup_bytepos_i(struct fu8_idxtab * tab, size_t cpidx)
 {
-    if (cpidx == 0) {
+    if (cpidx == 0 || tab == NULL) {
         return 0;
     }
     int step = tab->character_step;
@@ -236,5 +234,7 @@ ssize_t fu8_idx2bytepos(size_t index,
 {
     if (index == 0) { return 0; }
     if (index >= cplen) { return -1; }
-    return _fu8_idx2bytepos(index, 0, utf8, bytelen, cplen, tab);
+    size_t off = _fu8_idxtab_lookup_bytepos_i(tab[0], index);
+    //printf("found %llx\n", off);
+    return _fu8_build_idxtab(index, 0, cplen, utf8, bytelen, 0, tab);
 }
