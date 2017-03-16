@@ -107,7 +107,6 @@ ssize_t fu8_count_utf8_codepoints_avx(const char * utf8, ssize_t len)
         __m256i twobytemarker = _mm256_cmpgt_epi8(  chunk_signed, _mm256_set1_epi8(0xc0-1-0x80));
         __m256i threebytemarker = _mm256_cmpgt_epi8(chunk_signed, _mm256_set1_epi8(0xe0-1-0x80));
         __m256i fourbytemarker = _mm256_cmpgt_epi8( chunk_signed, _mm256_set1_epi8(0xf0-1-0x80));
-        _print_mmy("  two", twobytemarker);
 
         // the general idea of the following code collects 0xff for each byte position
         // in the variable contbytes.
@@ -197,9 +196,11 @@ ssize_t fu8_count_utf8_codepoints_avx(const char * utf8, ssize_t len)
 
         // now check that contbytes and the actual byte values have a valid
         // continuation at each position the marker indicates to have one
-        __m256i check_cont = _mm256_cmpgt_epi8(contbytes, zero);
+        __m256i check_cont = _mm256_cmpgt_epi8(zero, contbytes);
+        _print_mmy("  aaa", check_cont);
         __m256i contpos = _mm256_and_si256(_mm256_set1_epi8(0xc0), chunk);
         contpos = _mm256_cmpeq_epi8(_mm256_set1_epi8(0x80), contpos);
+        _print_mmy("  abc", contpos);
         __m256i validcont = _mm256_xor_si256(check_cont, contpos);
         if (_mm256_movemask_epi8(validcont) != 0) {
             // uff, nope, that is really not utf8
