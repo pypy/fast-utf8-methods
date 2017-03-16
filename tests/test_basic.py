@@ -7,11 +7,10 @@ from hypothesis import strategies as st
 class TestBasicFunctions(AbstractUnicodeTestCase):
     c_filename = 'utf8.c'
     cdef = """
-    ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len);
-    ssize_t count_utf8_codepoints_seq(const uint8_t * encoded, size_t len);
-    int _check_continuation(const uint8_t ** encoded, const uint8_t * endptr, int count);
-    extern ssize_t count_utf8_codepoints_sse4(const uint8_t * encoded, size_t len);
-    extern ssize_t count_utf8_codepoints_avx(const uint8_t * encoded, size_t len);
+    ssize_t fu8_count_utf8_codepoints(const char * encoded, size_t len);
+    ssize_t fu8_count_utf8_codepoints_seq(const char * encoded, size_t len);
+    extern ssize_t fu8_count_utf8_codepoints_sse4(const char * encoded, size_t len);
+    extern ssize_t fu8_count_utf8_codepoints_avx(const char * encoded, size_t len);
     """
 
     @settings(timeout=5, max_examples=2**10)
@@ -22,10 +21,11 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
             result = len(decoded)
         except UnicodeDecodeError:
             result = -1
-        assert self.lib.count_utf8_codepoints_seq(bytestring, len(bytestring)) == result
+        assert self.lib.fu8_count_utf8_codepoints_seq(bytestring, len(bytestring)) == result
 
     def test_check_example(self):
-        assert self.lib.count_utf8_codepoints_seq(b"\xe1\x80\x80", 3) == 1
+        assert self.lib.fu8_count_utf8_codepoints_seq(b"\xe1\x80\x80", 3) == 1
+
 
     @settings(timeout=20, max_examples=2**32)
     @given(bytestring=st.binary(min_size=16, max_size=64))
@@ -76,9 +76,8 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
         assert self.check(bytestring) == result
 
     def test_test(self):
-        ss = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xc2\x80'
-        result, bytestring = _utf8_check(ss)
-        assert self.check(bytestring) == result
+        b = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xc2\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+        assert self.lib.fu8_count_utf8_codepoints_avx(b, len(b)) == -1
 
     # test takes very long, takes over 4 hours. assumption is that
     # hypothesis should find those cases!
@@ -90,5 +89,5 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
     #            result = len(decoded)
     #        except UnicodeDecodeError:
     #            result = -1
-    #        assert self.lib.count_utf8_codepoints_seq(bytestring, len(bytestring)) == result
+    #        assert self.lib.fu8_count_utf8_codepoints_seq(bytestring, len(bytestring)) == result
 

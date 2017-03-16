@@ -18,6 +18,10 @@
 
 #endif
 
+#ifndef RPY_EXTERN
+#  define RPY_EXTERN
+#endif
+
 /**
  * Returns -1 if the given string is not a valid utf8 encoded string.
  * Otherwise returns the amount code point in the given string.

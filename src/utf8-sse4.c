@@ -90,12 +90,12 @@ ssize_t fu8_count_utf8_codepoints_sse4(const char * utf8, ssize_t len)
         }
 
         __m128i state2 = _mm_andnot_si128(threebytemarker, twobytemarker);
-        __m128i contbytes = _mm_slli_si128(_mm_blendv_epi8(state2, _mm_set1_epi8(0x1), twobytemarker), 1);
+        __m128i contbytes = _mm_slli_si128(state2, 1);
 
         if (_mm_movemask_epi8(threebytemarker) != 0) {
             // contains at least one 3 byte marker
             __m128i istate3 = _mm_andnot_si128(fourbytemarker, threebytemarker);
-            __m128i state3 = _mm_slli_si128(_mm_blendv_epi8(zero, _mm_set1_epi8(0x3), istate3), 1);
+            __m128i state3 = _mm_slli_si128(istate3, 1);
             state3 = _mm_or_si128(state3, _mm_slli_si128(state3, 1));
 
             contbytes = _mm_or_si128(contbytes, state3);
@@ -129,7 +129,7 @@ ssize_t fu8_count_utf8_codepoints_sse4(const char * utf8, ssize_t len)
 
         if (_mm_movemask_epi8(fourbytemarker) != 0) {
             // contain a 4 byte marker
-            __m128i istate4 = _mm_slli_si128(_mm_blendv_epi8(zero, _mm_set1_epi8(0x7), fourbytemarker), 1);
+            __m128i istate4 = _mm_slli_si128(fourbytemarker, 1);
             __m128i state4 =_mm_or_si128(istate4, _mm_slli_si128(istate4, 1));
             state4 =_mm_or_si128(state4, _mm_slli_si128(istate4, 2));
 
@@ -165,7 +165,7 @@ ssize_t fu8_count_utf8_codepoints_sse4(const char * utf8, ssize_t len)
 
         // now check that contbytes and the actual byte values have a valid
         // continuation at each position the marker indicates to have one
-        __m128i check_cont = _mm_cmpgt_epi8(contbytes, zero);
+        __m128i check_cont = _mm_cmplt_epi8(contbytes, zero);
         __m128i contpos = _mm_and_si128(_mm_set1_epi8(0xc0), chunk);
         contpos = _mm_cmpeq_epi8(_mm_set1_epi8(0x80), contpos);
         __m128i validcont = _mm_xor_si128(check_cont, contpos);
@@ -223,7 +223,7 @@ ssize_t fu8_count_utf8_codepoints_sse4(const char * utf8, ssize_t len)
         return num_codepoints;
     }
 
-    ssize_t result = fu8_count_utf8_codepoints_seq(encoded, len);
+    ssize_t result = fu8_count_utf8_codepoints_seq((const char*)encoded, len);
     if (result == -1) {
         return -1;
     }

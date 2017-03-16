@@ -51,9 +51,9 @@ class AbstractUnicodeTestCase(object):
         clz.lib = lib
 
     def check(self, bytestring):
-        seq = self.lib.count_utf8_codepoints(bytestring, len(bytestring))
-        generic = self.lib.count_utf8_codepoints(bytestring, len(bytestring))
-        sse = self.lib.count_utf8_codepoints_sse4(bytestring, len(bytestring))
-        avx = self.lib.count_utf8_codepoints_avx(bytestring, len(bytestring))
-        assert seq == generic == sse
+        generic = self.lib.fu8_count_utf8_codepoints(bytestring, len(bytestring))
+        seq = self.lib.fu8_count_utf8_codepoints_seq(bytestring, len(bytestring))
+        sse = self.lib.fu8_count_utf8_codepoints_sse4(bytestring, len(bytestring))
+        avx = self.lib.fu8_count_utf8_codepoints_avx(bytestring, len(bytestring))
+        assert seq == generic == sse == avx, "some implementation is incorrect"
         return seq

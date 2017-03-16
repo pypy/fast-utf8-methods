@@ -61,6 +61,16 @@ void _print_mmy(const char * msg, __m256i chunk)
     printf("\n");
 }
 
+__m256i _shift_left1_mm256(__m256i r, __m256i zero) {
+    // shift the individual 128bit parts, there might be several bytes missing
+    __m128i low128 = _mm256_extracti128_si256(r, 0);
+    __m256i v = _mm256_slli_si256(r, 1);
+    __m256i w = _mm256_inserti128_si256(zero, low128, 1);
+    // the low 128 shifted right!
+    __m256i lors = _mm256_srli_si256(w, 15);
+    return _mm256_or_si256(v, lors);
+}
+
 ssize_t fu8_count_utf8_codepoints_avx(const char * utf8, ssize_t len)
 {
     const uint8_t * encoded = (const uint8_t*)utf8;
@@ -84,10 +94,10 @@ ssize_t fu8_count_utf8_codepoints_avx(const char * utf8, ssize_t len)
         __builtin_prefetch(encoded+32, 0, 0);
 
         __m256i count = _mm256_set1_epi8(0x1);
-        //_print_mm256x("chunk", chunk);
+        _print_mmy("chunk", chunk);
         // fight against the fact that there is no comparison on unsigned values
         __m256i chunk_signed = _mm256_add_epi8(chunk, _mm256_set1_epi8(0x80));
-        //_print_mm256x("shunk", chunk_signed);
+        _print_mmy("shunk", chunk_signed);
 
         // ERROR checking
         // checking procedure works the following way:
@@ -97,6 +107,7 @@ ssize_t fu8_count_utf8_codepoints_avx(const char * utf8, ssize_t len)
         __m256i twobytemarker = _mm256_cmpgt_epi8(  chunk_signed, _mm256_set1_epi8(0xc0-1-0x80));
         __m256i threebytemarker = _mm256_cmpgt_epi8(chunk_signed, _mm256_set1_epi8(0xe0-1-0x80));
         __m256i fourbytemarker = _mm256_cmpgt_epi8( chunk_signed, _mm256_set1_epi8(0xf0-1-0x80));
+        _print_mmy("  two", twobytemarker);
 
         // the general idea of the following code collects 0xff for each byte position
         // in the variable contbytes.
@@ -110,13 +121,13 @@ ssize_t fu8_count_utf8_codepoints_avx(const char * utf8, ssize_t len)
         }
 
         __m256i state2 = _mm256_andnot_si256(threebytemarker, twobytemarker);
-        __m256i contbytes = _mm256_slli_si256(_mm256_blendv_epi8(state2, _mm256_set1_epi8(0x1), twobytemarker), 1);
+        __m256i contbytes = _shift_left1_mm256(state2, zero);
 
         if (_mm256_movemask_epi8(threebytemarker) != 0) {
             // contains at least one 3 byte marker
             __m256i istate3 = _mm256_andnot_si256(fourbytemarker, threebytemarker);
-            __m256i state3 = _mm256_slli_si256(_mm256_blendv_epi8(zero, _mm256_set1_epi8(0x3), istate3), 1);
-            state3 = _mm256_or_si256(state3, _mm256_slli_si256(state3, 1));
+            __m256i state3 = _shift_left1_mm256(istate3, zero);
+            state3 = _mm256_or_si256(state3, _shift_left1_mm256(state3, zero));
 
             contbytes = _mm256_or_si256(contbytes, state3);
 
@@ -124,7 +135,7 @@ ssize_t fu8_count_utf8_codepoints_avx(const char * utf8, ssize_t len)
             __m256i equal_e0 = _mm256_cmpeq_epi8(_mm256_blendv_epi8(zero, chunk_signed, istate3),
                                               _mm256_set1_epi8(0xe0-0x80));
             if (_mm256_movemask_epi8(equal_e0) != 0) {
-                __m256i mask = _mm256_blendv_epi8(_mm256_set1_epi8(0x7f), chunk_signed, _mm256_slli_si256(equal_e0, 1));
+                __m256i mask = _mm256_blendv_epi8(_mm256_set1_epi8(0x7f), chunk_signed, _shift_left1_mm256(equal_e0, zero));
                 __m256i check_surrogate = _mm256_cmpgt_epi8(_mm256_set1_epi8(0xa0-0x80), mask); // lt
                 if (_mm256_movemask_epi8(check_surrogate) != 0) {
                     // invalid surrograte character!!!
@@ -137,7 +148,7 @@ ssize_t fu8_count_utf8_codepoints_avx(const char * utf8, ssize_t len)
                 __m256i equal_ed = _mm256_cmpeq_epi8(_mm256_blendv_epi8(zero, chunk_signed, istate3),
                                                   _mm256_set1_epi8(0xed-0x80));
                 if (_mm256_movemask_epi8(equal_ed) != 0) {
-                    __m256i mask = _mm256_blendv_epi8(_mm256_set1_epi8(0x80), chunk_signed, _mm256_slli_si256(equal_ed, 1));
+                    __m256i mask = _mm256_blendv_epi8(_mm256_set1_epi8(0x80), chunk_signed, _shift_left1_mm256(equal_ed, zero));
                     __m256i check_surrogate = _mm256_cmpgt_epi8(mask, _mm256_set1_epi8(0xa0-1-0x80));
                     if (_mm256_movemask_epi8(check_surrogate) != 0) {
                         // invalid surrograte character!!!
@@ -149,9 +160,10 @@ ssize_t fu8_count_utf8_codepoints_avx(const char * utf8, ssize_t len)
 
         if (_mm256_movemask_epi8(fourbytemarker) != 0) {
             // contain a 4 byte marker
-            __m256i istate4 = _mm256_slli_si256(_mm256_blendv_epi8(zero, _mm256_set1_epi8(0x7), fourbytemarker), 1);
-            __m256i state4 =_mm256_or_si256(istate4, _mm256_slli_si256(istate4, 1));
-            state4 =_mm256_or_si256(state4, _mm256_slli_si256(istate4, 2));
+            __m256i istate4 = _shift_left1_mm256(fourbytemarker, zero);
+            __m256i iistate4 = _shift_left1_mm256(istate4, zero);
+            __m256i state4 =_mm256_or_si256(istate4, iistate4);
+            state4 =_mm256_or_si256(state4, _shift_left1_mm256(iistate4, zero));
 
             contbytes = _mm256_or_si256(contbytes, state4);
 
@@ -159,7 +171,7 @@ ssize_t fu8_count_utf8_codepoints_avx(const char * utf8, ssize_t len)
             __m256i equal_f0 = _mm256_cmpeq_epi8(_mm256_blendv_epi8(zero, chunk_signed, fourbytemarker),
                                               _mm256_set1_epi8(0xf0-0x80));
             if (_mm256_movemask_epi8(equal_f0) != 0) {
-                __m256i mask = _mm256_blendv_epi8(_mm256_set1_epi8(0x7f), chunk_signed, _mm256_slli_si256(equal_f0, 1));
+                __m256i mask = _mm256_blendv_epi8(_mm256_set1_epi8(0x7f), chunk_signed, _shift_left1_mm256(equal_f0, zero));
                 __m256i check_surrogate = _mm256_cmpgt_epi8(_mm256_set1_epi8(0x90-0x80), mask);
                 if (_mm256_movemask_epi8(check_surrogate) != 0) {
                     return -1;
@@ -169,7 +181,7 @@ ssize_t fu8_count_utf8_codepoints_avx(const char * utf8, ssize_t len)
             __m256i equal_f4 = _mm256_cmpeq_epi8(_mm256_blendv_epi8(zero, chunk_signed, fourbytemarker),
                                               _mm256_set1_epi8(0xf4-0x80));
             if (_mm256_movemask_epi8(equal_f4) != 0) {
-                __m256i mask = _mm256_blendv_epi8(_mm256_set1_epi8(0x80), chunk_signed, _mm256_slli_si256(equal_f4, 1));
+                __m256i mask = _mm256_blendv_epi8(_mm256_set1_epi8(0x80), chunk_signed, _shift_left1_mm256(equal_f4, zero));
                 __m256i check_surrogate = _mm256_cmpgt_epi8(mask, _mm256_set1_epi8(0x90-1-0x80));
                 if (_mm256_movemask_epi8(check_surrogate) != 0) {
                     return -1;
@@ -245,7 +257,7 @@ ssize_t fu8_count_utf8_codepoints_avx(const char * utf8, ssize_t len)
         return num_codepoints;
     }
 
-    ssize_t result = fu8_count_utf8_codepoints_seq(encoded, len);
+    ssize_t result = fu8_count_utf8_codepoints_seq((const char*)encoded, len);
     if (result == -1) {
         return -1;
     }

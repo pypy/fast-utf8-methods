@@ -128,7 +128,6 @@ ssize_t _fu8_build_idxtab(size_t cpidx, size_t cpidx_off, size_t cplen,
         }
 
         uint8_t c = *utf8++;
-        //printf("%x\n", c);
         code_point_index += 1;
         if ((c & 0xc0) == 0) {
             continue;
@@ -150,18 +149,6 @@ ssize_t _fu8_build_idxtab(size_t cpidx, size_t cpidx_off, size_t cplen,
     return -1; // out of bounds!!
 }
 
-size_t _fu8_idxtab_lookup_bytepos_i(struct fu8_idxtab * tab, size_t cpidx);
-
-ssize_t _fu8_idx2bytepos(size_t index,
-                        const uint8_t * utf8, size_t bytelen, size_t cplen,
-                        struct fu8_idxtab ** tab)
-{
-
-    assert(index != 0 && "index must not be 0");
-    // note that itab STILL can be NULL
-
-}
-
 size_t _fu8_idxtab_lookup_bytepos_i(struct fu8_idxtab * tab, size_t cpidx)
 {
     if (cpidx == 0 || tab == NULL) {
@@ -180,51 +167,6 @@ size_t _fu8_idxtab_lookup_bytepos_i(struct fu8_idxtab * tab, size_t cpidx)
     }
     // no clue, start at the beginning!
     return 0;
-
-    //int lp, rp; // left position, right position
-    //int mp; // middle position
-    //int count;
-    //lp = 0;
-    //rp = 16;
-
-    //if (cpidx == 0) {
-    //    return -1;
-    //}
-
-    //size_t valid_left = -1;
-
-    //do {
-    //    count = (rp - lp);
-    //    mp = lp + count / 2;
-
-    //    size_t lval = tab->codepoint_positions[lp];
-    //    size_t mval = tab->codepoint_positions[mp];
-    //    size_t rval = tab->codepoint_positions[rp];
-    //    printf("l %d m %d r %d\nlv %d mv %d rv %d\n", lp, mp, rp, lval, mval, rval);
-    //    if (lval != 0 && lval <= cpidx) {
-    //        valid_left = lp;
-    //    } else if (lval == 0) {
-    //        // nothing is known about the left most value
-    //        break;
-    //    }
-
-    //    if (mval == cpidx) {
-    //        return mp;
-    //    }
-
-    //    if (mval == 0 || mval < cpidx) {
-    //        // nothing is known about the middle value,
-    //        // or mval is smaller the searched code point index
-    //        rp = mp;
-    //        continue;
-    //    } else {
-    //        lp = mp;
-    //        continue;
-    //    }
-
-    //} while (count > 1);
-
-    //return valid_left;
 }
 
 ssize_t fu8_idx2bytepos(size_t index,
@@ -234,7 +176,8 @@ ssize_t fu8_idx2bytepos(size_t index,
 {
     if (index == 0) { return 0; }
     if (index >= cplen) { return -1; }
-    size_t off = _fu8_idxtab_lookup_bytepos_i(tab[0], index);
+    _fu8_idxtab_lookup_bytepos_i(tab[0], index);
+    // TODO why is off not used???
     //printf("found %llx\n", off);
     return _fu8_build_idxtab(index, 0, cplen, utf8, bytelen, 0, tab);
 }
