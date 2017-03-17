@@ -94,10 +94,10 @@ ssize_t fu8_count_utf8_codepoints_avx(const char * utf8, ssize_t len)
         __builtin_prefetch(encoded+32, 0, 0);
 
         __m256i count = _mm256_set1_epi8(0x1);
-        _print_mmy("chunk", chunk);
+        //_print_mmy("chunk", chunk);
         // fight against the fact that there is no comparison on unsigned values
         __m256i chunk_signed = _mm256_add_epi8(chunk, _mm256_set1_epi8(0x80));
-        _print_mmy("shunk", chunk_signed);
+        //_print_mmy("shunk", chunk_signed);
 
         // ERROR checking
         // checking procedure works the following way:
@@ -197,10 +197,8 @@ ssize_t fu8_count_utf8_codepoints_avx(const char * utf8, ssize_t len)
         // now check that contbytes and the actual byte values have a valid
         // continuation at each position the marker indicates to have one
         __m256i check_cont = _mm256_cmpgt_epi8(zero, contbytes);
-        _print_mmy("  aaa", check_cont);
         __m256i contpos = _mm256_and_si256(_mm256_set1_epi8(0xc0), chunk);
         contpos = _mm256_cmpeq_epi8(_mm256_set1_epi8(0x80), contpos);
-        _print_mmy("  abc", contpos);
         __m256i validcont = _mm256_xor_si256(check_cont, contpos);
         if (_mm256_movemask_epi8(validcont) != 0) {
             // uff, nope, that is really not utf8
