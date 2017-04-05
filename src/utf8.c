@@ -3,13 +3,31 @@
 #include <stdio.h>
 #include <assert.h>
 
-#include "utf8-scalar.c" // copy code for scalar operations
+#include <stdlib.h>
 
-
-int instruction_set = -1;
 #define ISET_SSE4 0x1
 #define ISET_AVX 0x2
 #define ISET_AVX2 0x4
+
+typedef struct fu8_idxtab {
+    int character_step;
+    size_t * byte_positions;
+    size_t bytepos_table_length;
+} fu8_idxtab_t;
+
+typedef struct fu8_idx_lookup {
+    size_t codepoint_index;
+    size_t codepoint_offset;
+    size_t codepoint_length;
+    const uint8_t * utf8;
+    size_t byte_offset;
+    size_t byte_length;
+    struct fu8_idxtab ** table;
+} fu8_idx_lookup_t;
+
+#include "utf8-scalar.c" // copy code for scalar operations
+
+int instruction_set = -1;
 
 void detect_instructionset(void)
 {
@@ -56,14 +74,6 @@ ssize_t fu8_count_utf8_codepoints(const char * utf8, ssize_t len)
     return fu8_count_utf8_codepoints_seq(utf8, len);
 }
 
-typedef struct fu8_idxtab {
-    int character_step;
-    size_t * byte_positions;
-    size_t bytepos_table_length;
-} fu8_idxtab_t;
-
-#include <stdlib.h>
-
 fu8_idxtab_t * _fu8_alloc_idxtab(int cp_count, int character_step)
 {
     if (cp_count <= character_step) {
@@ -96,70 +106,49 @@ void _fu8_itab_set_bucket(struct fu8_idxtab * tab, int bucket, size_t off, size_
     tab->byte_positions[bucket] = off;
 }
 
-ssize_t _fu8_build_idxtab(size_t cpidx, size_t cpidx_off, size_t cplen,
-                          const uint8_t * utf8, size_t bytelen, size_t byteoff,
-                          struct fu8_idxtab ** tab) {
-    size_t code_point_index = cpidx_off;
-    const uint8_t * utf8_start_position = utf8 + byteoff;
-    const uint8_t * utf8_end_position = utf8 + bytelen - byteoff;
+ssize_t _fu8_index(size_t cpidx, size_t cpidx_off, size_t cplen,
+                   const uint8_t * utf8, size_t bytelen, size_t byteoff,
+                   struct fu8_idxtab ** tab) {
 
-    struct fu8_idxtab * itab = tab[0];
-    if (itab == NULL) {
-        tab[0] = itab = _fu8_alloc_idxtab(cplen, 1000);
+    fu8_idx_lookup_t l = {
+        .codepoint_index = cpidx,
+        .codepoint_offset = cpidx_off,
+        .codepoint_length = cplen,
+        .utf8 = utf8,
+        .byte_offset = byteoff,
+        .byte_length = bytelen,
+        .table = tab
+    };
+
+    // detect instruction set that is available on this machine
+    if (instruction_set == -1) { detect_instructionset(); }
+
+    if (bytelen >= 32 && (instruction_set & ISET_AVX2) != 0) {
+        // to the MOON!
+        //return fu8_count_utf8_codepoints_avx(utf8, len);
+    }
+    if (bytelen >= 16 && (instruction_set == ISET_SSE4) != 0) {
+        // some extra speed!!
+        return _fu8_index_sse4(&l);
     }
 
-    int bucket_step = -1;
-    int bucket = -1;
-    if (itab) {
-        bucket_step = itab->character_step;
-        bucket = cpidx_off / bucket_step;
-        //printf("bucket %d step %d iindex_off %ld\n", bucket, bucket_step, cpidx_off);
-    }
-
-    while (utf8 < utf8_end_position) {
-        //printf("%d %llx ok\n", code_point_index, utf8);
-        if (code_point_index == cpidx) {
-            //printf("return %llx %llx %llx\n", utf8_start_position, utf8, utf8_end_position);
-            return utf8 - utf8_start_position;
-        }
-
-        if (bucket_step != -1 && code_point_index != 0 && (code_point_index % bucket_step) == 0) {
-            _fu8_itab_set_bucket(itab, bucket++, byteoff + utf8 - utf8_start_position, code_point_index);
-        }
-
-        uint8_t c = *utf8++;
-        code_point_index += 1;
-        if ((c & 0xc0) == 0) {
-            continue;
-        }
-        if ((c & 0xe0) == 0xc0) {
-            utf8 += 1;
-            continue;
-        }
-        if ((c & 0xf0) == 0xe0) {
-            utf8 += 2;
-            continue;
-        }
-        if ((c & 0xf8) == 0xf0) {
-            utf8 += 3;
-            continue;
-        }
-    }
-
-    return -1; // out of bounds!!
+    // oh no, just do it sequentially!
+    return _fu8_index_seq(&l);
 }
 
-size_t _fu8_idxtab_lookup_bytepos_i(struct fu8_idxtab * tab, size_t cpidx)
+
+size_t _fu8_idxtab_lookup_bytepos_i(struct fu8_idxtab * tab, size_t * cpidx)
 {
     if (cpidx == 0 || tab == NULL) {
         return 0;
     }
     int step = tab->character_step;
-    int tidx = cpidx / step;
+    int tidx = *cpidx / step;
     size_t val = tab->byte_positions[tidx];
     while (tidx > 0) {
         if (val != 0) {
             //printf("%llx at %d %d/%d\n", val, tidx, cpidx, step);
+            *cpidx = tidx * step;
             return val;
         }
         tidx--;
@@ -174,10 +163,9 @@ ssize_t fu8_idx2bytepos(size_t index,
                         size_t cplen,
                         struct fu8_idxtab ** tab)
 {
-    if (index == 0) { return 0; }
+    if (index <= 0) { return 0; }
     if (index >= cplen) { return -1; }
-    _fu8_idxtab_lookup_bytepos_i(tab[0], index);
-    // TODO why is off not used???
-    //printf("found %llx\n", off);
-    return _fu8_build_idxtab(index, 0, cplen, utf8, bytelen, 0, tab);
+    size_t cpoff = index;
+    size_t off = _fu8_idxtab_lookup_bytepos_i(tab[0], &cpoff);
+    return _fu8_build_idxtab(index, cpoff, cplen, utf8, bytelen, byteoff, tab);
 }

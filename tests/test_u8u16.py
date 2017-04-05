@@ -9,11 +9,10 @@ from os.path import join, exists
 class TestBasicFunctions(AbstractUnicodeTestCase):
     c_filename = 'utf8.c'
     cdef = """
-    ssize_t count_utf8_codepoints(const uint8_t * encoded, size_t len);
-    ssize_t count_utf8_codepoints_seq(const uint8_t * encoded, size_t len);
-    int _check_continuation(const uint8_t ** encoded, const uint8_t * endptr, int count);
-    extern ssize_t count_utf8_codepoints_sse4(const uint8_t * encoded, size_t len);
-    extern ssize_t count_utf8_codepoints_avx(const uint8_t * encoded, size_t len);
+    ssize_t fu8_count_utf8_codepoints(const uint8_t * encoded, size_t len);
+    ssize_t fu8_count_utf8_codepoints_seq(const uint8_t * encoded, size_t len);
+    extern ssize_t fu8_count_utf8_codepoints_sse4(const uint8_t * encoded, size_t len);
+    extern ssize_t fu8_count_utf8_codepoints_avx(const uint8_t * encoded, size_t len);
     """
 
     def setup_class(clz):

@@ -67,3 +67,6 @@ RPY_EXTERN void fu8_free_idxtab(struct fu8_idxtab * t);
 RPY_EXTERN ssize_t fu8_idx2bytepso_sse4(size_t index,
                              const uint8_t * utf8, size_t len,
                              struct fu8_idxtab ** t);
+
+
+ssize_t _fu8_index_seq(fu8_idx_lookup_t * l);

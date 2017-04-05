@@ -1,7 +1,7 @@
 PyPy's utf8 utility methods
 ===========================
 
-Copy u8u16 from the internet archive to the folder `thridparty/u8u16`.
+[![Build Status on TravisCI](https://travis-ci.org/pypy/fast-utf8-methods.svg?branch=master)](https://travis-ci.org/pypy/fast-utf8-methods)
 
 TODO
 ----

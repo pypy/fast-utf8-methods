@@ -69,3 +69,55 @@ ssize_t fu8_count_utf8_codepoints_seq(const char * utf8, ssize_t len) {
     }
     return num_codepoints;
 }
+
+ssize_t _fu8_index_seq(fu8_idx_lookup_t * l) {
+    size_t index = l->codepoint_offset;
+    const uint8_t * utf8 = l->utf8;
+    const uint8_t * utf8_start_position = l->utf8 + l->byte_offset;
+    const uint8_t * utf8_end_position = l->utf8 + l->byte_length - l->byte_offset;
+
+    struct fu8_idxtab * itab = l->table[0];
+    if (itab == NULL) {
+        l->table[0] = itab = _fu8_alloc_idxtab(l->codepoint_length, 1000);
+    }
+
+    int bucket_step = -1;
+    int bucket = -1;
+    if (itab) {
+        bucket_step = itab->character_step;
+        bucket = l->codepoint_offset / bucket_step;
+        //printf("bucket %d step %d iindex_off %ld\n", bucket, bucket_step, cpidx_off);
+    }
+
+    while (utf8 < utf8_end_position) {
+        //printf("%d %llx ok\n", code_point_index, utf8);
+        if (index == l->codepoint_index) {
+            //printf("return %llx %llx %llx\n", utf8_start_position, utf8, utf8_end_position);
+            return utf8 - utf8_start_position;
+        }
+
+        if (bucket_step != -1 && index != 0 && (index % bucket_step) == 0) {
+            _fu8_itab_set_bucket(itab, bucket++, utf8 - utf8_start_position + l->byte_offset, index);
+        }
+
+        uint8_t c = *utf8++;
+        index += 1;
+        if ((c & 0xc0) == 0) {
+            continue;
+        }
+        if ((c & 0xe0) == 0xc0) {
+            utf8 += 1;
+            continue;
+        }
+        if ((c & 0xf0) == 0xe0) {
+            utf8 += 2;
+            continue;
+        }
+        if ((c & 0xf8) == 0xf0) {
+            utf8 += 3;
+            continue;
+        }
+    }
+
+    return -1; // out of bounds!!
+}
