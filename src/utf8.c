@@ -15,20 +15,8 @@ int instruction_set = -1;
 
 void detect_instructionset(void)
 {
-    long eax;
-    long ebx;
-    long ecx;
-    long edx;
-    long op = 1;
-    asm ("cpuid"
-            : "=a" (eax),
-              "=b" (ebx),
-              "=c" (ecx),
-              "=d" (edx)
-            : "a" (op));
-
     instruction_set = 0;
-    if (ecx & (1<<19)) { // sse4.1
+    if (__builtin_cpu_supports("sse4.1")) {
         instruction_set |= ISET_SSE4;
     }
     if(__builtin_cpu_supports("avx")) {
