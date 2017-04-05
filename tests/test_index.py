@@ -3,6 +3,7 @@ from tests.support import AbstractUnicodeTestCase, _utf8_check
 from hypothesis import given, example
 from hypothesis import settings
 from hypothesis import strategies as st
+import pytest
 
 class itab(object):
     def __init__(self, ffi, lib):
@@ -40,6 +41,15 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
             idx2bytepos[i] = pos
             pos += len(ed)
         return idx2bytepos, b''.join(bytelist)
+
+    @pytest.mark.parametrize('text,i,result', [
+        ("0" * 10, 1, 1),
+    ])
+    def test_basic(self, text, i, result):
+        idx2bytepos, utf8 = self._build_utf8_idx2bytepos(text)
+        with itab(self.ffi, self.lib) as t:
+            args = [i, len(text), utf8, len(utf8), t]
+            assert self.lib.fu8_idx2bytepos(*args) == result
 
     @settings(timeout=5, max_examples=2**32)
     @given(text=st.text(average_size=150), data=st.data())

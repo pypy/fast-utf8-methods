@@ -243,7 +243,7 @@ ssize_t _fu8_index_sse4(fu8_idx_lookup_t * l) {
 
     __builtin_prefetch(utf8, 0, 0);
     if (itab == NULL) {
-        l->table[0] = itab = _fu8_alloc_idxtab(l->codepoint_length, 1000);
+        l->table[0] = itab = _fu8_alloc_idxtab(l->codepoint_length);
     }
 
     if (itab) {

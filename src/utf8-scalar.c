@@ -78,7 +78,7 @@ ssize_t _fu8_index_seq(fu8_idx_lookup_t * l) {
 
     struct fu8_idxtab * itab = l->table[0];
     if (itab == NULL) {
-        l->table[0] = itab = _fu8_alloc_idxtab(l->codepoint_length, 1000);
+        l->table[0] = itab = _fu8_alloc_idxtab(l->codepoint_length);
     }
 
     int bucket_step = -1;
@@ -86,11 +86,11 @@ ssize_t _fu8_index_seq(fu8_idx_lookup_t * l) {
     if (itab) {
         bucket_step = itab->character_step;
         bucket = l->codepoint_offset / bucket_step;
-        //printf("bucket %d step %d iindex_off %ld\n", bucket, bucket_step, cpidx_off);
+        //printf("bucket %d step %d\n", bucket, bucket_step);
     }
 
     while (utf8 < utf8_end_position) {
-        //printf("%d %llx ok\n", code_point_index, utf8);
+        //printf("%d %p %p ok\n", l->codepoint_index, utf8, utf8_start_position);
         if (index == l->codepoint_index) {
             //printf("return %llx %llx %llx\n", utf8_start_position, utf8, utf8_end_position);
             return utf8 - utf8_start_position;

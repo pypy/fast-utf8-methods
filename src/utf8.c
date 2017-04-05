@@ -46,8 +46,9 @@ ssize_t fu8_count_utf8_codepoints(const char * utf8, ssize_t len)
     return fu8_count_utf8_codepoints_seq(utf8, len);
 }
 
-fu8_idxtab_t * _fu8_alloc_idxtab(int cp_count, int character_step)
+fu8_idxtab_t * _fu8_alloc_idxtab(int cp_count)
 {
+    int character_step = 1000;
     if (cp_count <= character_step) {
         return NULL;
     }
@@ -130,7 +131,7 @@ ssize_t fu8_idx2bytepos(size_t cpidx, size_t cplen,
 
     fu8_idx_lookup_t l = {
         .codepoint_index = cpidx,
-        .codepoint_offset = index,
+        .codepoint_offset = 0,
         .codepoint_length = cplen,
         .utf8 = utf8,
         .byte_offset = utf8pos,
