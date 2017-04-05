@@ -1,4 +1,4 @@
-#include "utf8.h"
+#include "utf8-private.h"
 
 #include <stdio.h>
 #include <assert.h>
@@ -8,22 +8,6 @@
 #define ISET_SSE4 0x1
 #define ISET_AVX 0x2
 #define ISET_AVX2 0x4
-
-typedef struct fu8_idxtab {
-    int character_step;
-    size_t * byte_positions;
-    size_t bytepos_table_length;
-} fu8_idxtab_t;
-
-typedef struct fu8_idx_lookup {
-    size_t codepoint_index;
-    size_t codepoint_offset;
-    size_t codepoint_length;
-    const uint8_t * utf8;
-    size_t byte_offset;
-    size_t byte_length;
-    struct fu8_idxtab ** table;
-} fu8_idx_lookup_t;
 
 #include "utf8-scalar.c" // copy code for scalar operations
 
@@ -106,22 +90,11 @@ void _fu8_itab_set_bucket(struct fu8_idxtab * tab, int bucket, size_t off, size_
     tab->byte_positions[bucket] = off;
 }
 
-ssize_t _fu8_index(size_t cpidx, size_t cpidx_off, size_t cplen,
-                   const uint8_t * utf8, size_t bytelen, size_t byteoff,
-                   struct fu8_idxtab ** tab) {
-
-    fu8_idx_lookup_t l = {
-        .codepoint_index = cpidx,
-        .codepoint_offset = cpidx_off,
-        .codepoint_length = cplen,
-        .utf8 = utf8,
-        .byte_offset = byteoff,
-        .byte_length = bytelen,
-        .table = tab
-    };
-
+ssize_t _fu8_index(fu8_idx_lookup_t * l) {
     // detect instruction set that is available on this machine
     if (instruction_set == -1) { detect_instructionset(); }
+
+    size_t bytelen = l->byte_length;
 
     if (bytelen >= 32 && (instruction_set & ISET_AVX2) != 0) {
         // to the MOON!
@@ -129,11 +102,11 @@ ssize_t _fu8_index(size_t cpidx, size_t cpidx_off, size_t cplen,
     }
     if (bytelen >= 16 && (instruction_set == ISET_SSE4) != 0) {
         // some extra speed!!
-        return _fu8_index_sse4(&l);
+        return _fu8_index_sse4(l);
     }
 
     // oh no, just do it sequentially!
-    return _fu8_index_seq(&l);
+    return _fu8_index_seq(l);
 }
 
 
@@ -158,14 +131,24 @@ size_t _fu8_idxtab_lookup_bytepos_i(struct fu8_idxtab * tab, size_t * cpidx)
     return 0;
 }
 
-ssize_t fu8_idx2bytepos(size_t index,
-                        const uint8_t * utf8, size_t bytelen,
-                        size_t cplen,
+ssize_t fu8_idx2bytepos(size_t cpidx, size_t cplen,
+                        const uint8_t * utf8, size_t utf8len,
                         struct fu8_idxtab ** tab)
 {
-    if (index <= 0) { return 0; }
-    if (index >= cplen) { return -1; }
-    size_t cpoff = index;
-    size_t off = _fu8_idxtab_lookup_bytepos_i(tab[0], &cpoff);
-    return _fu8_build_idxtab(index, cpoff, cplen, utf8, bytelen, byteoff, tab);
+    if (cpidx <= 0) { return 0; }
+    if (cpidx >= cplen) { return -1; }
+    size_t index = cpidx;
+    size_t utf8pos = _fu8_idxtab_lookup_bytepos_i(tab[0], &index);
+
+    fu8_idx_lookup_t l = {
+        .codepoint_index = cpidx,
+        .codepoint_offset = index,
+        .codepoint_length = cplen,
+        .utf8 = utf8,
+        .byte_offset = utf8pos,
+        .byte_length = utf8len,
+        .table = tab
+    };
+
+    return _fu8_index(&l);
 }

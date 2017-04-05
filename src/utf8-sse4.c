@@ -1,10 +1,11 @@
-#include "utf8.h"
+#include "utf8-private.h"
 
 #include <stddef.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <xmmintrin.h>
 #include <smmintrin.h>
+#include <assert.h>
 
 #define BIT(B,P) ((B >> (P-1)) & 0x1)
 
@@ -260,7 +261,7 @@ ssize_t _fu8_index_sse4(fu8_idx_lookup_t * l) {
         __builtin_prefetch(utf8+16, 0, 0);
         __m128i contmask = _mm_and_si128(_mm_set1_epi8(0xc0), chunk);
         __m128i contpos = _mm_cmpeq_epi8(_mm_set1_epi8(0x80), contmask);
-        int codepointsbits = _mm_movemask_epi8(contpos)
+        int codepointsbits = _mm_movemask_epi8(contpos);
         int codepoints = 16 - __builtin_popcount(codepointsbits);
 
         int mask_chunk = _mm_movemask_epi8(chunk);
@@ -277,7 +278,6 @@ ssize_t _fu8_index_sse4(fu8_idx_lookup_t * l) {
         // 6) 4 byte code point. e.g. ...  f2 80 80 | 80 ...
         //
         int offset = 16;
-        int minus_codepoints = 0;
         if (BIT(mask_chunk, 16) != 0 && BIT(mask_conti, 16) == 0) { // 1), 2), 4)
             codepoints -= 1;
             offset -= 1;

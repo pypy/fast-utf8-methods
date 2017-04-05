@@ -25,9 +25,8 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
     cdef = """
     typedef ... fu8_idxtab_t;
     void fu8_free_idxtab(fu8_idxtab_t * t);
-    ssize_t fu8_idx2bytepos(size_t index,
-                            const uint8_t * utf8, size_t bytelen,
-                            size_t cplen,
+    ssize_t fu8_idx2bytepos(size_t cpidx, size_t cplen,
+                            const uint8_t * utf8, size_t utf8len,
                             fu8_idxtab_t ** t);
     """
 
@@ -50,7 +49,7 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
         i = data.draw(st.integers(min_value=0, max_value=len(text)+len(text)*0.01))
         idx2bytepos, utf8 = self._build_utf8_idx2bytepos(text)
         with itab(self.ffi, self.lib) as t:
-            args = [i, utf8, len(utf8), len(text), t]
+            args = [i, len(text), utf8, len(utf8), t]
             result = self.lib.fu8_idx2bytepos(*args)
         if len(text) == 0:
             assert result == 0
@@ -68,7 +67,7 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
         for j in range(1000):
             i = data.draw(st.integers(min_value=0, max_value=len(text)+len(text)*0.01))
             with itab(self.ffi, self.lib) as t:
-                args = [i, utf8, len(utf8), len(text), t]
+                args = [i, len(text), utf8, len(utf8), t]
                 result = self.lib.fu8_idx2bytepos(*args)
             if len(text) == 0:
                 assert result == 0
@@ -84,13 +83,13 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
         idx2bytepos, utf8 = self._build_utf8_idx2bytepos(text)
         # prebuild the table
         with itab(self.ffi, self.lib) as t:
-            args = [max(len(text)-1, 0), utf8, len(utf8), len(text), t]
+            args = [max(len(text)-1, 0), len(text), utf8, len(utf8), t]
             result = self.lib.fu8_idx2bytepos(*args)
 
         for j in range(1000):
             i = data.draw(st.integers(min_value=0, max_value=len(text)+len(text)*0.01))
             with itab(self.ffi, self.lib) as t:
-                args = [i, utf8, len(utf8), len(text), t]
+                args = [i, len(text), utf8, len(utf8), t]
                 result = self.lib.fu8_idx2bytepos(*args)
             if len(text) == 0:
                 assert result == 0
@@ -104,7 +103,7 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
         i = 2037
         idx2bytepos, utf8 = self._build_utf8_idx2bytepos(text)
         with itab(self.ffi, self.lib) as t:
-            args = [i, utf8, len(utf8), len(text), t]
+            args = [i, len(text), utf8, len(utf8), t]
             result = self.lib.fu8_idx2bytepos(*args)
             result = self.lib.fu8_idx2bytepos(*args)
         if len(text) == 0:

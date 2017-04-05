@@ -1,4 +1,4 @@
-#include "utf8.h"
+#include "utf8-private.h"
 
 int _check_continuation(const uint8_t ** encoded, const uint8_t * endptr, int count) {
     ssize_t size = endptr - *encoded;

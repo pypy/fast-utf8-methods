@@ -59,9 +59,8 @@ struct fu8_idxtab;
  * table to speed up indexing.
  *
  */
-RPY_EXTERN ssize_t fu8_idx2bytepos(size_t index,
-                        const uint8_t * utf8, size_t bytelen,
-                        size_t cplen,
+RPY_EXTERN ssize_t fu8_idx2bytepos(size_t cpidx, size_t cplen,
+                        const uint8_t * utf8, size_t utf8len,
                         struct fu8_idxtab ** tab);
 RPY_EXTERN void fu8_free_idxtab(struct fu8_idxtab * t);
 RPY_EXTERN ssize_t fu8_idx2bytepso_sse4(size_t index,
@@ -69,4 +68,5 @@ RPY_EXTERN ssize_t fu8_idx2bytepso_sse4(size_t index,
                              struct fu8_idxtab ** t);
 
 
+typedef struct fu8_idx_lookup fu8_idx_lookup_t;
 ssize_t _fu8_index_seq(fu8_idx_lookup_t * l);
