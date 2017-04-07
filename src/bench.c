@@ -180,3 +180,12 @@ ret_t _bench_mystringlenutf8(const uint8_t * bytes, int len)
     cp_strlen_utf8((char*)bytes);
     return CLOCK_END;
 }
+
+ret_t _bench_index_seq(ssize_t index, const uint8_t * utf8, int utf8len,
+                       ssize_t codepoints, fu8_idxtab_t ** t)
+{
+    CLOCK_DEFS;
+    CLOCK_START;
+    fu8_idx2bytepos(index, codepoints, utf8, utf8len, t);
+    return CLOCK_END;
+}

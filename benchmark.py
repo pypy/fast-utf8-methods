@@ -3,6 +3,8 @@ import sys
 from os.path import dirname, join
 from cffi import FFI
 import importlib
+import numpy
+from tests.test_index import itab
 
 def compile_ffi(cdef, files, modulename, defines=[], includes=[],
                 verbose=False, link_flags=[]):
@@ -41,8 +43,11 @@ double _bench_vec_sse4(const uint8_t * bytes, int len);
 double _bench_vec_avx2(const uint8_t * bytes, int len);
 double _bench_libunistring(const uint8_t * bytes, int len);
 double _bench_mystringlenutf8(const uint8_t * bytes, int len);
-""", 'bench.c', 'bench', verbose=False)
 
+double _bench_index_seq(ssize_t index, const uint8_t * bytes, ssize_t len, ssize_t cplen);
+
+ssize_t fu8_count_utf8_codepoints(const uint8_t * bytes, ssize_t len);
+""", 'bench.c', 'bench', verbose=False)
 
 def run(loops, data, func):
     clock = 0
@@ -51,7 +56,21 @@ def run(loops, data, func):
         clock += c
     return clock
 
-def run_file(runner, name, filename):
+def inner_loop_index(loops, data, func):
+    clock = 0
+    cplen = lib.fu8_count_utf8_codepoints(data, len(data))
+    assert cplen >= 0
+    sigma = cplen/4
+    mu = cplen/2
+    with itab(ffi, lib) as t:
+        for i in range(loops):
+            i = numpy.random.normal(mu, sigma)
+            assert 0 <= i < cplen
+            c = func(i, data, len(data), cplen, t)
+            clock += c
+    return clock
+
+def run_check(runner, name, filename):
     with open(filename, 'rb') as fd:
         data = fd.read()
         il = 10
@@ -62,8 +81,17 @@ def run_file(runner, name, filename):
         # Just length checking, no validation http://www.daemonology.net/blog/2008-06-05-faster-utf8-strlen.html
         runner.bench_sample_func('mystrlenutf8-'+name, run, data, lib._bench_mystringlenutf8, inner_loops=il)
 
+def run_index(runner, name, filename):
+    with open(filename, 'rb') as fd:
+        data = fd.read()
+        il = 10
+        runner.bench_sample_func('pypy-seq-'+name, inner_loop_index, data, lib._bench_seq, inner_loops=il)
+
 runner = perf.Runner()
 # a news website containing german umlauts and some other unicode chars, but expected mostly ascii
-#run_file(runner, 'news-de', 'tests/html/derstandard.at.html')
-#run_file(runner, 'news-cn', 'tests/html/worldjournal.cn.html')
-run_file(runner, 'tipitaka-thai', 'tests/html/tipitaka-thai.html')
+#run_check(runner, 'news-de', 'tests/html/derstandard.at.html')
+#run_check(runner, 'news-cn', 'tests/html/worldjournal.cn.html')
+#run_check(runner, 'tipitaka-thai', 'tests/html/tipitaka-thai.html')
+
+run_index(runner, 'news-de', 'tests/html/derstandard.at.html')
+

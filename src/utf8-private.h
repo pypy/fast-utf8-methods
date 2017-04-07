@@ -2,6 +2,8 @@
 
 #include "utf8.h"
 
+#define IDX_TO_BUCKET(O, I, S) O = (I/S-1); if (O < 0) { O = 0; }
+
 /**
  * The private functions & data structures.
  * Can be used internally...
@@ -23,7 +25,7 @@ typedef struct fu8_idx_lookup {
     struct fu8_idxtab ** table;
 } fu8_idx_lookup_t;
 
-struct fu8_idxtab * _fu8_alloc_idxtab(int, int);
+struct fu8_idxtab * _fu8_alloc_idxtab(int);
 void _fu8_itab_set_bucket(struct fu8_idxtab *, int, size_t, size_t);
 
 /**

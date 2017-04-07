@@ -1,9 +1,10 @@
-#include "utf8.h"
+#include "utf8-private.h"
 
 #include <stddef.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <immintrin.h>
+#include <assert.h>
 
 #define BIT(B,P) ((B >> (P-1)) & 0x1)
 
@@ -263,4 +264,113 @@ ssize_t fu8_count_utf8_codepoints_avx(const char * utf8, ssize_t len)
 
     return num_codepoints + result;
     return -1;
+}
+
+#define REGISTER_BYTES 32
+
+ssize_t _fu8_index_avx2(fu8_idx_lookup_t * l) {
+    size_t index = l->codepoint_offset;
+    const uint8_t * utf8 = l->utf8 + l->byte_offset;
+    const uint8_t * utf8_start_position = l->utf8;
+    const uint8_t * utf8_end_position = l->utf8 + l->byte_length;
+    int bucket_step = -1;
+    int bucket = -1;
+    struct fu8_idxtab * itab = l->table[0];
+
+    __builtin_prefetch(utf8, 0, 0);
+    if (itab == NULL) {
+        l->table[0] = itab = _fu8_alloc_idxtab(l->codepoint_length);
+        //printf("table is null allocating\n");
+    }
+
+    if (itab) {
+        bucket_step = itab->character_step;
+        IDX_TO_BUCKET(bucket, l->codepoint_offset, bucket_step);
+        //printf("bucket %d step %d iindex_off %ld\n", bucket, bucket_step, l->codepoint_offset);
+    }
+
+    if (index == l->codepoint_index) {
+        return utf8 - utf8_start_position;
+    }
+
+    while (utf8 < utf8_end_position) {
+        __m256i chunk = _mm256_loadu_si256((__m256i*)utf8);
+        __builtin_prefetch(utf8+REGISTER_BYTES, 0, 0);
+        __m256i contmask = _mm256_and_si256(_mm256_set1_epi8(0xc0), chunk);
+        __m256i contpos = _mm256_cmpeq_epi8(_mm256_set1_epi8(0x80), contmask);
+        int codepointsbits = _mm256_movemask_epi8(contpos);
+        int codepoints = REGISTER_BYTES - __builtin_popcount(codepointsbits);
+
+        int mask_chunk = _mm256_movemask_epi8(chunk);
+        int mask_conti = _mm256_movemask_epi8(contpos);
+
+        // these cases need to be handled:
+        //                      32 byte boundary -> | <- 32 byte boundary
+        // -----------------------------------------+--------------------
+        // 1) 2 byte code point. e.g. ...  c2       | 80 ...
+        // 2) 3 byte code point. e.g. ...  e6       | 80 80 ...
+        // 3) 3 byte code point. e.g. ...  e6 80    | 80 ...
+        // 4) 4 byte code point. e.g. ...  f2       | 80 80 80 ...
+        // 5) 4 byte code point. e.g. ...  f2 80    | 80 80 ...
+        // 6) 4 byte code point. e.g. ...  f2 80 80 | 80 ...
+        //
+        int offset = 32;
+        if (BIT(mask_chunk, 32) != 0 && BIT(mask_conti, 32) == 0) { // 1), 2), 4)
+            codepoints -= 1;
+            offset -= 1;
+        } else if (BIT(mask_chunk, 31) != 0 && BIT(mask_conti, 31) == 0 &&
+                   BIT(mask_conti, 32) == 1) { // 3), 5)
+            codepoints -= 1;
+            offset -= 2;
+        } else if (BIT(mask_chunk, 30) != 0 && BIT(mask_conti, 30) == 0 &&
+                   BIT(mask_conti, 31) == 1 && BIT(mask_conti, 32) == 1) { // 6)
+            codepoints -= 1;
+            offset -= 3;
+        }
+
+        size_t new_index = index + codepoints;
+
+        if (bucket_step != -1 && new_index >= bucket_step && (new_index % bucket_step) <= 32) {
+            // the desired byte position is in [offset, offset+16), there is no
+            // way to know without walking each byte (only check the MSB of each byte)
+            new_index = index;
+            for (int p = 0; p < 32; p++) {
+                int contib = BIT(mask_conti, p);
+                if (!contib) {
+                    if ((new_index % bucket_step) == 0) {
+                        _fu8_itab_set_bucket(itab, bucket++, utf8 - utf8_start_position + p, new_index);
+                        break;
+                    }
+                    new_index++;
+                }
+            }
+        }
+
+        new_index = index + codepoints;
+
+        if (new_index > l->codepoint_index) {
+            // advanced too much, step through
+            new_index = index;
+            for (int p = 0; p < 32; p++) {
+                int contib = BIT(mask_conti, p);
+                if (!contib) {
+                    if (new_index == l->codepoint_index) {
+                        return (utf8 - utf8_start_position) + p;
+                    }
+                    new_index++;
+                }
+            }
+            assert(0 && "must find codepoint index!");
+        }
+        utf8 += offset;
+        index = new_index;
+
+        if (index == l->codepoint_index) {
+            // will most most of the time now directly hit the right code points
+            // chances are 1 in 16 bytes...
+            return utf8 - utf8_start_position;
+        }
+    }
+
+    return -1; // out of bounds!!
 }

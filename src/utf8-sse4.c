@@ -234,9 +234,9 @@ ssize_t fu8_count_utf8_codepoints_sse4(const char * utf8, ssize_t len)
 
 ssize_t _fu8_index_sse4(fu8_idx_lookup_t * l) {
     size_t index = l->codepoint_offset;
-    const uint8_t * utf8 = l->utf8;
-    const uint8_t * utf8_start_position = l->utf8 + l->byte_offset;
-    const uint8_t * utf8_end_position = l->utf8 + l->byte_length - l->byte_offset;
+    const uint8_t * utf8 = l->utf8 + l->byte_offset;
+    const uint8_t * utf8_start_position = l->utf8;
+    const uint8_t * utf8_end_position = l->utf8 + l->byte_length;
     int bucket_step = -1;
     int bucket = -1;
     struct fu8_idxtab * itab = l->table[0];
@@ -244,12 +244,13 @@ ssize_t _fu8_index_sse4(fu8_idx_lookup_t * l) {
     __builtin_prefetch(utf8, 0, 0);
     if (itab == NULL) {
         l->table[0] = itab = _fu8_alloc_idxtab(l->codepoint_length);
+        //printf("table is null allocating\n");
     }
 
     if (itab) {
         bucket_step = itab->character_step;
-        bucket = l->codepoint_offset / bucket_step;
-        //printf("bucket %d step %d iindex_off %ld\n", bucket, bucket_step, cpidx_off);
+        IDX_TO_BUCKET(bucket, l->codepoint_offset, bucket_step);
+        //printf("bucket %d step %d iindex_off %ld\n", bucket, bucket_step, l->codepoint_offset);
     }
 
     if (index == l->codepoint_index) {
@@ -293,21 +294,23 @@ ssize_t _fu8_index_sse4(fu8_idx_lookup_t * l) {
 
         size_t new_index = index + codepoints;
 
-        if (bucket_step != -1 && (new_index % bucket_step) < 16) {
+        if (bucket_step != -1 && new_index >= bucket_step && (new_index % bucket_step) <= 16) {
             // the desired byte position is in [offset, offset+16), there is no
-            // way to know without walking each byte
+            // way to know without walking each byte (only check the MSB of each byte)
             new_index = index;
             for (int p = 0; p < 16; p++) {
                 int contib = BIT(mask_conti, p);
                 if (!contib) {
-                    new_index++;
                     if ((new_index % bucket_step) == 0) {
-                        _fu8_itab_set_bucket(itab, bucket++, utf8 - utf8_start_position + l->byte_offset + p, new_index);
+                        _fu8_itab_set_bucket(itab, bucket++, utf8 - utf8_start_position + p, new_index);
                         break;
                     }
+                    new_index++;
                 }
             }
         }
+
+        new_index = index + codepoints;
 
         if (new_index > l->codepoint_index) {
             // advanced too much, step through
@@ -315,10 +318,10 @@ ssize_t _fu8_index_sse4(fu8_idx_lookup_t * l) {
             for (int p = 0; p < 16; p++) {
                 int contib = BIT(mask_conti, p);
                 if (!contib) {
-                    new_index++;
                     if (new_index == l->codepoint_index) {
                         return (utf8 - utf8_start_position) + p;
                     }
+                    new_index++;
                 }
             }
             assert(0 && "must find codepoint index!");

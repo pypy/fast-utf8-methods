@@ -24,7 +24,11 @@ class itab(object):
 class TestBasicFunctions(AbstractUnicodeTestCase):
     c_filename = 'utf8.c'
     cdef = """
-    typedef ... fu8_idxtab_t;
+    typedef struct fu8_idxtab {
+        int character_step;
+        size_t * byte_positions;
+        size_t bytepos_table_length;
+    } fu8_idxtab_t;
     void fu8_free_idxtab(fu8_idxtab_t * t);
     ssize_t fu8_idx2bytepos(size_t cpidx, size_t cplen,
                             const uint8_t * utf8, size_t utf8len,
@@ -114,8 +118,9 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
         idx2bytepos, utf8 = self._build_utf8_idx2bytepos(text)
         with itab(self.ffi, self.lib) as t:
             args = [i, len(text), utf8, len(utf8), t]
+            result2 = self.lib.fu8_idx2bytepos(*args)
             result = self.lib.fu8_idx2bytepos(*args)
-            result = self.lib.fu8_idx2bytepos(*args)
+            assert result2 == result
         if len(text) == 0:
             assert result == 0
         elif i >= len(text):
@@ -123,36 +128,27 @@ class TestBasicFunctions(AbstractUnicodeTestCase):
         else:
             assert result == idx2bytepos[i]
 
-    #def test_binsearch(self):
-    #    itab = self.ffi.new("fu8_idxtab_t[1]")
-    #    check = lambda p: self.lib._fu8_idxtab_binary_search_bytepos_i(itab, p)
-    #    #
-    #    return
-    #    itab[0].codepoint_positions[0:16] = [15,17,18,29,100]+[0]*11
-    #    assert check(17) == 1
-    #    return
-    #    assert check(15) == 0
-    #    assert check(16) == 0
-    #    assert check(18) == 2
-    #    assert check(19) == 2
-    #    assert check(28) == 2
-    #    assert check(29) == 3
-    #    assert check(30) == 3
-    #    assert check(99) == 3
-    #    assert check(100) == 4
-    #    assert check(101) == 4
-    #    assert check(101000) == 4
-    #    for i in range(15):
-    #        assert check(i) == -1
-    #    #
-    #    itab[0].codepoint_positions[0:16] = [15]+[0]*15
-    #    assert check(15) == 0
-    #    assert check(100) == 0
-    #    assert check(0) == -1
-    #    for i in range(15):
-    #        assert check(i) == -1
-    #    #
-    #    itab[0].codepoint_positions[0:16] = [0]*16
-    #    for i in range(16):
-    #        assert check(i) == -1 # empty table
+    def test_linear_index_table(self):
+        text = "0" * 10000
+        step = 1000
+        with itab(self.ffi, self.lib) as t:
+            assert self._check_index(text, 0, t) == 0
+            assert t[0] == self.ffi.NULL
+            assert self._check_index(text, step-40, t) == step-40
+            assert t[0].byte_positions[0] == 0
+            assert self._check_index(text, step+1, t) == step+1
+            assert t[0].byte_positions[0] == step
+            assert t[0].byte_positions[1] == 0
+            assert self._check_index(text, 9999, t) == 9999
+            assert self._check_index(text, 9999, t) == 9999
+            for i in range(9):
+                assert t[0].byte_positions[i] == (i+1)*step
+
+        with itab(self.ffi, self.lib) as t:
+            assert self._check_index(text, 0, t) == 0
+
+    def _check_index(self, text, i, table):
+        idx2bytepos, utf8 = self._build_utf8_idx2bytepos(text)
+        args = [i, len(text), utf8, len(utf8), table]
+        return self.lib.fu8_idx2bytepos(*args)
 

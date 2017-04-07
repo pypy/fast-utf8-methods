@@ -77,6 +77,7 @@ void _fu8_itab_set_bucket(struct fu8_idxtab * tab, int bucket, size_t off, size_
     }
     assert(bucket >= 0 && bucket < tab->bytepos_table_length && "index out of bounds");
     tab->byte_positions[bucket] = off;
+    //printf("setting table bucket %d to bytes %d at index %d, %d\n", bucket, off, cpidx, tab->byte_positions[bucket]);
 }
 
 ssize_t _fu8_index(fu8_idx_lookup_t * l) {
@@ -87,9 +88,9 @@ ssize_t _fu8_index(fu8_idx_lookup_t * l) {
 
     if (bytelen >= 32 && (instruction_set & ISET_AVX2) != 0) {
         // to the MOON!
-        //return fu8_count_utf8_codepoints_avx(utf8, len);
+        return _fu8_index_avx2(l);
     }
-    if (bytelen >= 16 && (instruction_set == ISET_SSE4) != 0) {
+    if (bytelen >= 16 && (instruction_set & ISET_SSE4) != 0) {
         // some extra speed!!
         return _fu8_index_sse4(l);
     }
@@ -98,25 +99,27 @@ ssize_t _fu8_index(fu8_idx_lookup_t * l) {
     return _fu8_index_seq(l);
 }
 
-
-size_t _fu8_idxtab_lookup_bytepos_i(struct fu8_idxtab * tab, size_t * cpidx)
+size_t _fu8_idxtab_lookup_bytepos_i(size_t cpidx, struct fu8_idxtab * tab, size_t * cpoff)
 {
     if (cpidx == 0 || tab == NULL) {
         return 0;
     }
     int step = tab->character_step;
-    int tidx = *cpidx / step;
-    size_t val = tab->byte_positions[tidx];
-    while (tidx > 0) {
+    int bucket;
+    IDX_TO_BUCKET(bucket, cpidx, step);
+    size_t val = tab->byte_positions[bucket];
+    //printf("using table bucket %d, *step=%d, %d, idx %d\n", bucket, bucket*step, val, cpidx);
+    while (bucket > 0) {
         if (val != 0) {
-            //printf("%llx at %d %d/%d\n", val, tidx, cpidx, step);
-            *cpidx = tidx * step;
+            *cpoff = (bucket+1) * step;
+            //printf("%d at %d ,,, out = %d\n", val, bucket, *cpoff);
             return val;
         }
-        tidx--;
-        val = tab->byte_positions[tidx];
+        bucket--;
+        val = tab->byte_positions[bucket];
     }
     // no clue, start at the beginning!
+    *cpoff = 0;
     return 0;
 }
 
@@ -126,12 +129,12 @@ ssize_t fu8_idx2bytepos(size_t cpidx, size_t cplen,
 {
     if (cpidx <= 0) { return 0; }
     if (cpidx >= cplen) { return -1; }
-    size_t index = cpidx;
-    size_t utf8pos = _fu8_idxtab_lookup_bytepos_i(tab[0], &index);
+    size_t cpoff = 0;
+    size_t utf8pos = _fu8_idxtab_lookup_bytepos_i(cpidx, tab[0], &cpoff);
 
     fu8_idx_lookup_t l = {
         .codepoint_index = cpidx,
-        .codepoint_offset = 0,
+        .codepoint_offset = cpoff,
         .codepoint_length = cplen,
         .utf8 = utf8,
         .byte_offset = utf8pos,

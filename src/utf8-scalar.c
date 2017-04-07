@@ -72,9 +72,9 @@ ssize_t fu8_count_utf8_codepoints_seq(const char * utf8, ssize_t len) {
 
 ssize_t _fu8_index_seq(fu8_idx_lookup_t * l) {
     size_t index = l->codepoint_offset;
-    const uint8_t * utf8 = l->utf8;
-    const uint8_t * utf8_start_position = l->utf8 + l->byte_offset;
-    const uint8_t * utf8_end_position = l->utf8 + l->byte_length - l->byte_offset;
+    const uint8_t * utf8 = l->utf8 + l->byte_offset;
+    const uint8_t * utf8_start_position = l->utf8;
+    const uint8_t * utf8_end_position = l->utf8 + l->byte_length;
 
     struct fu8_idxtab * itab = l->table[0];
     if (itab == NULL) {
@@ -85,19 +85,19 @@ ssize_t _fu8_index_seq(fu8_idx_lookup_t * l) {
     int bucket = -1;
     if (itab) {
         bucket_step = itab->character_step;
-        bucket = l->codepoint_offset / bucket_step;
-        //printf("bucket %d step %d\n", bucket, bucket_step);
+        IDX_TO_BUCKET(bucket, l->codepoint_offset, bucket_step);
+        //printf("bucket %d, %d %d\n", bucket, l->codepoint_offset, bucket_step);
     }
 
     while (utf8 < utf8_end_position) {
         //printf("%d %p %p ok\n", l->codepoint_index, utf8, utf8_start_position);
         if (index == l->codepoint_index) {
-            //printf("return %llx %llx %llx\n", utf8_start_position, utf8, utf8_end_position);
+            //printf("return %llx %llx %llx, %d\n", utf8_start_position, utf8, utf8_end_position, utf8 - utf8_start_position);
             return utf8 - utf8_start_position;
         }
 
         if (bucket_step != -1 && index != 0 && (index % bucket_step) == 0) {
-            _fu8_itab_set_bucket(itab, bucket++, utf8 - utf8_start_position + l->byte_offset, index);
+            _fu8_itab_set_bucket(itab, bucket++, utf8 - utf8_start_position, index);
         }
 
         uint8_t c = *utf8++;
