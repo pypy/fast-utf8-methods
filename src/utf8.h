@@ -68,5 +68,5 @@ RPY_EXTERN ssize_t fu8_idx2bytepso_sse4(size_t index,
                              struct fu8_idxtab ** t);
 
 
-typedef struct fu8_idx_lookup fu8_idx_lookup_t;
-ssize_t _fu8_index_seq(fu8_idx_lookup_t * l);
+struct fu8_idx_lookup;
+ssize_t _fu8_index_seq(struct fu8_idx_lookup * l);
