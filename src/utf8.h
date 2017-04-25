@@ -70,3 +70,5 @@ RPY_EXTERN ssize_t fu8_idx2bytepso_sse4(size_t index,
 
 struct fu8_idx_lookup;
 ssize_t _fu8_index_seq(struct fu8_idx_lookup * l);
+ssize_t _fu8_index_sse4(struct fu8_idx_lookup * l);
+ssize_t _fu8_index_avx2(struct fu8_idx_lookup * l);

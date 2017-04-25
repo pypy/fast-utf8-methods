@@ -29,39 +29,39 @@ typedef double ret_t;
 #define CLOCK_END ((double)(clock() - cycs) / CLOCKS_PER_SEC)
 #endif
 
-ret_t _bench_seq(const uint8_t * bytes, int len)
+ret_t _bench_seq(const char * bytes, int len)
 {
     CLOCK_DEFS;
     CLOCK_START;
-    count_utf8_codepoints_seq(bytes, len);
+    fu8_count_utf8_codepoints_seq(bytes, len);
     return CLOCK_END;
 }
 
-ret_t _bench_vec_sse4(const uint8_t * bytes, int len)
+ret_t _bench_vec_sse4(const char * bytes, int len)
 {
     CLOCK_DEFS;
     CLOCK_START;
-    count_utf8_codepoints_sse4(bytes, len);
+    fu8_count_utf8_codepoints_sse4(bytes, len);
     return CLOCK_END;
 }
 
-ret_t _bench_vec_avx2(const uint8_t * bytes, int len)
+ret_t _bench_vec_avx2(const char * bytes, int len)
 {
     CLOCK_DEFS;
     CLOCK_START;
-    count_utf8_codepoints_avx(bytes, len);
+    fu8_count_utf8_codepoints_avx(bytes, len);
     return CLOCK_END;
 }
 
-const uint8_t *
-u8_check (const uint8_t *s, size_t n)
+const char *
+u8_check (const char *s, size_t n)
 {
-  const uint8_t *s_end = s + n;
+  const char *s_end = s + n;
 
   while (s < s_end)
     {
       /* Keep in sync with unistr.h and u8-mbtouc-aux.c.  */
-      uint8_t c = *s;
+      char c = *s;
 
       if (c < 0x80)
         {
@@ -109,7 +109,7 @@ u8_check (const uint8_t *s, size_t n)
   return NULL;
 }
 
-ret_t _bench_libunistring(const uint8_t * bytes, int len)
+ret_t _bench_libunistring(const char * bytes, int len)
 {
     CLOCK_DEFS;
     CLOCK_START;
@@ -172,7 +172,7 @@ done:
 	return ((s - _s) - count);
 }
 
-ret_t _bench_mystringlenutf8(const uint8_t * bytes, int len)
+ret_t _bench_mystringlenutf8(const char * bytes, int len)
 {
     CLOCK_DEFS;
 
@@ -181,11 +181,29 @@ ret_t _bench_mystringlenutf8(const uint8_t * bytes, int len)
     return CLOCK_END;
 }
 
-ret_t _bench_index_seq(ssize_t index, const uint8_t * utf8, int utf8len,
+ret_t _bench_index_seq(ssize_t index, const char * utf8, int utf8len,
                        ssize_t codepoints, fu8_idxtab_t ** t)
 {
     CLOCK_DEFS;
     CLOCK_START;
-    fu8_idx2bytepos(index, codepoints, utf8, utf8len, t);
+    fu8_idx2bytepos(index, codepoints, (const uint8_t*)utf8, utf8len, t);
+    return CLOCK_END;
+}
+
+ret_t _bench_index_sse4(ssize_t index, const char * utf8, int utf8len,
+                       ssize_t codepoints, fu8_idxtab_t ** t)
+{
+    CLOCK_DEFS;
+    CLOCK_START;
+    fu8_idx2bytepos_sse4(index, codepoints, (const uint8_t*)utf8, utf8len, t);
+    return CLOCK_END;
+}
+
+ret_t _bench_index_avx2(ssize_t index, const char * utf8, int utf8len,
+                       ssize_t codepoints, fu8_idxtab_t ** t)
+{
+    CLOCK_DEFS;
+    CLOCK_START;
+    fu8_idx2bytepos_avx2(index, codepoints, (const uint8_t*)utf8, utf8len, t);
     return CLOCK_END;
 }
