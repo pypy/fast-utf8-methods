@@ -183,6 +183,16 @@ ret_t _bench_mystringlenutf8(const char * bytes, int len)
     return CLOCK_END;
 }
 
+__attribute__((optimize("-O0")))
+ret_t _bench_index_constant(ssize_t index, const char * utf8, int utf8len,
+                            ssize_t codepoints, fu8_idxtab_t ** t)
+{
+    CLOCK_DEFS;
+    CLOCK_START;
+    utf8[index];
+    return CLOCK_END;
+}
+
 ret_t _bench_index_seq(ssize_t index, const char * utf8, int utf8len,
                        ssize_t codepoints, fu8_idxtab_t ** t)
 {

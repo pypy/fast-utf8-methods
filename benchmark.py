@@ -46,6 +46,7 @@ double _bench_mystringlenutf8(const char * bytes, int len);
 
 struct fu8_idxtab;
 typedef struct fu8_idxtab fu8_idxtab_t;
+double _bench_index_constant(ssize_t, const char *, int, ssize_t, fu8_idxtab_t**);
 double _bench_index_seq(ssize_t, const char *, int, ssize_t, fu8_idxtab_t**);
 double _bench_index_sse4(ssize_t, const char *, int, ssize_t, fu8_idxtab_t**);
 double _bench_index_avx2(ssize_t, const char *, int, ssize_t, fu8_idxtab_t**);
@@ -91,6 +92,7 @@ def run_index(runner, name, filename):
     with open(filename, 'rb') as fd:
         data = fd.read()
         il = 10
+        runner.bench_sample_func('pypy-const-'+name, inner_loop_index, data, lib._bench_index_constant, inner_loops=il)
         runner.bench_sample_func('pypy-seq-'+name, inner_loop_index, data, lib._bench_index_seq, inner_loops=il)
         runner.bench_sample_func('pypy-sse4-'+name, inner_loop_index, data, lib._bench_index_sse4, inner_loops=il)
         runner.bench_sample_func('pypy-avx2-'+name, inner_loop_index, data, lib._bench_index_avx2, inner_loops=il)
