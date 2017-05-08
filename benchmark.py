@@ -38,15 +38,20 @@ def compile_ffi(cdef, files, modulename, defines=[], includes=[],
     return _test.ffi, _test.lib
 
 ffi, lib = compile_ffi("""
-double _bench_seq(const uint8_t * bytes, int len);
-double _bench_vec_sse4(const uint8_t * bytes, int len);
-double _bench_vec_avx2(const uint8_t * bytes, int len);
-double _bench_libunistring(const uint8_t * bytes, int len);
-double _bench_mystringlenutf8(const uint8_t * bytes, int len);
+double _bench_seq(const char * bytes, int len);
+double _bench_vec_sse4(const char * bytes, int len);
+double _bench_vec_avx2(const char * bytes, int len);
+double _bench_libunistring(const char * bytes, int len);
+double _bench_mystringlenutf8(const char * bytes, int len);
 
-double _bench_index_seq(ssize_t index, const uint8_t * bytes, ssize_t len, ssize_t cplen);
+struct fu8_idxtab;
+typedef struct fu8_idxtab fu8_idxtab_t;
+double _bench_index_seq(ssize_t, const char *, int, ssize_t, fu8_idxtab_t**);
+double _bench_index_sse4(ssize_t, const char *, int, ssize_t, fu8_idxtab_t**);
+double _bench_index_avx2(ssize_t, const char *, int, ssize_t, fu8_idxtab_t**);
 
-ssize_t fu8_count_utf8_codepoints(const uint8_t * bytes, ssize_t len);
+ssize_t fu8_count_utf8_codepoints(const char * bytes, ssize_t len);
+void fu8_free_idxtab(struct fu8_idxtab *);
 """, 'bench.c', 'bench', verbose=False)
 
 def run(loops, data, func):
@@ -65,8 +70,9 @@ def inner_loop_index(loops, data, func):
     with itab(ffi, lib) as t:
         for i in range(loops):
             i = numpy.random.normal(mu, sigma)
-            assert 0 <= i < cplen
-            c = func(i, data, len(data), cplen, t)
+            if not 0 <= i < cplen:
+                continue
+            c = func(int(i), data, len(data), int(cplen), t)
             clock += c
     return clock
 
@@ -85,7 +91,9 @@ def run_index(runner, name, filename):
     with open(filename, 'rb') as fd:
         data = fd.read()
         il = 10
-        runner.bench_sample_func('pypy-seq-'+name, inner_loop_index, data, lib._bench_seq, inner_loops=il)
+        runner.bench_sample_func('pypy-seq-'+name, inner_loop_index, data, lib._bench_index_seq, inner_loops=il)
+        runner.bench_sample_func('pypy-sse4-'+name, inner_loop_index, data, lib._bench_index_sse4, inner_loops=il)
+        runner.bench_sample_func('pypy-avx2-'+name, inner_loop_index, data, lib._bench_index_avx2, inner_loops=il)
 
 runner = perf.Runner()
 # a news website containing german umlauts and some other unicode chars, but expected mostly ascii

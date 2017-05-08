@@ -60,11 +60,17 @@ struct fu8_idxtab;
  *
  */
 RPY_EXTERN ssize_t fu8_idx2bytepos(size_t cpidx, size_t cplen,
-                        const uint8_t * utf8, size_t utf8len,
+                        const char * utf8, size_t utf8len,
                         struct fu8_idxtab ** tab);
 RPY_EXTERN void fu8_free_idxtab(struct fu8_idxtab * t);
-RPY_EXTERN ssize_t fu8_idx2bytepso_sse4(size_t index,
-                             const uint8_t * utf8, size_t len,
+RPY_EXTERN ssize_t _fu8_idx2bytepos_seq(size_t index, size_t cplen,
+                             const char * utf8, size_t utf8len,
+                             struct fu8_idxtab ** t);
+RPY_EXTERN ssize_t _fu8_idx2bytepos_sse4(size_t index, size_t cplen,
+                             const char * utf8, size_t utf8len,
+                             struct fu8_idxtab ** t);
+RPY_EXTERN ssize_t _fu8_idx2bytepos_avx2(size_t index, size_t cplen,
+                             const char * utf8, size_t utf8len,
                              struct fu8_idxtab ** t);
 
 

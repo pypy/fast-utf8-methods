@@ -124,7 +124,7 @@ size_t _fu8_idxtab_lookup_bytepos_i(size_t cpidx, struct fu8_idxtab * tab, size_
 }
 
 ssize_t fu8_idx2bytepos(size_t cpidx, size_t cplen,
-                        const uint8_t * utf8, size_t utf8len,
+                        const char * utf8, size_t utf8len,
                         struct fu8_idxtab ** tab)
 {
     if (cpidx <= 0) { return 0; }
@@ -136,11 +136,77 @@ ssize_t fu8_idx2bytepos(size_t cpidx, size_t cplen,
         .codepoint_index = cpidx,
         .codepoint_offset = cpoff,
         .codepoint_length = cplen,
-        .utf8 = utf8,
+        .utf8 = (uint8_t*)utf8,
         .byte_offset = utf8pos,
         .byte_length = utf8len,
         .table = tab
     };
 
     return _fu8_index(&l);
+}
+
+ssize_t _fu8_idx2bytepos_seq(size_t cpidx, size_t cplen,
+                        const char * utf8, size_t utf8len,
+                        struct fu8_idxtab ** tab)
+{
+    if (cpidx <= 0) { return 0; }
+    if (cpidx >= cplen) { return -1; }
+    size_t cpoff = 0;
+    size_t utf8pos = _fu8_idxtab_lookup_bytepos_i(cpidx, tab[0], &cpoff);
+
+    fu8_idx_lookup_t l = {
+        .codepoint_index = cpidx,
+        .codepoint_offset = cpoff,
+        .codepoint_length = cplen,
+        .utf8 = (uint8_t*)utf8,
+        .byte_offset = utf8pos,
+        .byte_length = utf8len,
+        .table = tab
+    };
+
+    return _fu8_index_seq(&l);
+}
+
+ssize_t _fu8_idx2bytepos_sse4(size_t cpidx, size_t cplen,
+                             const char * utf8, size_t utf8len,
+                             struct fu8_idxtab ** tab)
+{
+    if (cpidx <= 0) { return 0; }
+    if (cpidx >= cplen) { return -1; }
+    size_t cpoff = 0;
+    size_t utf8pos = _fu8_idxtab_lookup_bytepos_i(cpidx, tab[0], &cpoff);
+
+    fu8_idx_lookup_t l = {
+        .codepoint_index = cpidx,
+        .codepoint_offset = cpoff,
+        .codepoint_length = cplen,
+        .utf8 = (uint8_t*)utf8,
+        .byte_offset = utf8pos,
+        .byte_length = utf8len,
+        .table = tab
+    };
+
+    return _fu8_index_sse4(&l);
+}
+
+ssize_t _fu8_idx2bytepos_avx2(size_t cpidx, size_t cplen,
+                             const char * utf8, size_t utf8len,
+                             struct fu8_idxtab ** tab)
+{
+    if (cpidx <= 0) { return 0; }
+    if (cpidx >= cplen) { return -1; }
+    size_t cpoff = 0;
+    size_t utf8pos = _fu8_idxtab_lookup_bytepos_i(cpidx, tab[0], &cpoff);
+
+    fu8_idx_lookup_t l = {
+        .codepoint_index = cpidx,
+        .codepoint_offset = cpoff,
+        .codepoint_length = cplen,
+        .utf8 = (uint8_t*)utf8,
+        .byte_offset = utf8pos,
+        .byte_length = utf8len,
+        .table = tab
+    };
+
+    return _fu8_index_avx2(&l);
 }
