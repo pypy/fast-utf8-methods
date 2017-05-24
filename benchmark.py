@@ -100,8 +100,10 @@ def run_index(runner, name, filename):
 runner = perf.Runner()
 # a news website containing german umlauts and some other unicode chars, but expected mostly ascii
 #run_check(runner, 'news-de', 'tests/html/derstandard.at.html')
-#run_check(runner, 'news-cn', 'tests/html/worldjournal.cn.html')
+#run_check(runner, 'wiki-cn', 'tests/html/wiki.cn.html')
 #run_check(runner, 'tipitaka-thai', 'tests/html/tipitaka-thai.html')
 
 run_index(runner, 'news-de', 'tests/html/derstandard.at.html')
+run_index(runner, 'wiki-cn', 'tests/html/wiki.cn.html')
+run_index(runner, 'tipitaka-thai', 'tests/html/tipitaka-thai.html')
 
