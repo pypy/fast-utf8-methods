@@ -44,6 +44,7 @@ double _bench_vec_avx2(const char * bytes, int len);
 double _bench_libunistring(const char * bytes, int len);
 double _bench_mystringlenutf8(const char * bytes, int len);
 
+<<<<<<< HEAD
 struct fu8_idxtab;
 typedef struct fu8_idxtab fu8_idxtab_t;
 double _bench_index_constant(ssize_t, const char *, int, ssize_t, fu8_idxtab_t**);
@@ -53,6 +54,16 @@ double _bench_index_avx2(ssize_t, const char *, int, ssize_t, fu8_idxtab_t**);
 
 ssize_t fu8_count_utf8_codepoints(const char * bytes, ssize_t len);
 void fu8_free_idxtab(struct fu8_idxtab *);
+=======
+typedef ... fu8_idxtab_t;
+double _bench_index_seq(ssize_t index, const char * bytes, ssize_t len, ssize_t cplen, fu8_idxtab_t ** t);
+double _bench_index_sse4(ssize_t index, const char * bytes, ssize_t len, ssize_t cplen, fu8_idxtab_t ** t);
+double _bench_index_avx2(ssize_t index, const char * bytes, ssize_t len, ssize_t cplen, fu8_idxtab_t ** t);
+
+ssize_t fu8_count_utf8_codepoints(const char * bytes, ssize_t len);
+
+void fu8_free_idxtab(fu8_idxtab_t * t);
+>>>>>>> c5472db3ea61faacc4c0930b4bdbb177645ad006
 """, 'bench.c', 'bench', verbose=False)
 
 def run(loops, data, func):
@@ -62,7 +73,7 @@ def run(loops, data, func):
         clock += c
     return clock
 
-def inner_loop_index(loops, data, func):
+def inner_loop_index(data, func, loops):
     clock = 0
     cplen = lib.fu8_count_utf8_codepoints(data, len(data))
     assert cplen >= 0

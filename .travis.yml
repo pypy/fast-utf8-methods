@@ -1,7 +1,5 @@
-dist: trusty
-language: python
-python:
-  - "3.6"
+os: osx
+language: generic
 install:
   - pip install -r requirements.txt
   # builds the sse and avx versions!

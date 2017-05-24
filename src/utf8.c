@@ -6,8 +6,7 @@
 #include <stdlib.h>
 
 #define ISET_SSE4 0x1
-#define ISET_AVX 0x2
-#define ISET_AVX2 0x4
+#define ISET_AVX2 0x2
 
 #include "utf8-scalar.c" // copy code for scalar operations
 
@@ -16,13 +15,31 @@ int instruction_set = -1;
 void detect_instructionset(void)
 {
     instruction_set = 0;
-    if (__builtin_cpu_supports("sse4.1")) {
+    long eax;
+    long ebx;
+    long ecx;
+    long edx;
+    long op = 1;
+
+    __asm("cpuid"
+        : "=a" (eax),
+          "=b" (ebx),
+          "=c" (ecx),
+          "=d" (edx)
+        : "a" (op));
+
+    instruction_set = 0;
+    if (ecx & (1<<19)) { // sse4.1
         instruction_set |= ISET_SSE4;
     }
-    if(__builtin_cpu_supports("avx")) {
-        instruction_set |= ISET_AVX;
-    }
-    if(__builtin_cpu_supports("avx2")) {
+    op = 7;
+    __asm("cpuid"
+        : "=a" (eax),
+          "=b" (ebx),
+          "=c" (ecx),
+          "=d" (edx)
+        : "a" (op));
+    if (ebx & (1<<5)) {
         instruction_set |= ISET_AVX2;
     }
 }

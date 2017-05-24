@@ -215,7 +215,8 @@ ssize_t fu8_count_utf8_codepoints_sse4(const char * utf8, ssize_t len)
             lenoff -= 3;
         }
 
-        num_codepoints += (c & 0xff) + ((c >> 8) & 0xff) - minus_codepoints;
+        uint16_t cps = (c & 0xff) + ((c >> 8) & 0xff);
+        num_codepoints += cps - minus_codepoints;
         len -= lenoff;
         encoded += lenoff;
     }
